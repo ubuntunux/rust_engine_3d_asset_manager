@@ -16,7 +16,7 @@ bl_info = {
     "location": "File > Import/Export",
     "description": "RustEngine3D Asset import/export addon.",
     "warning": "",
-    "doc_url": "https://github.com/ubuntunux/RustEngine3D",
+    "doc_url": "https://github.com/ubuntunux/rust_engine_3d_asset_manager",
     "category": "Import-Export",
 }
 
