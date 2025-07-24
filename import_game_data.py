@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import uuid
+import json
 
 import bpy
 
@@ -76,15 +77,36 @@ class AssetImportManager:
     def load_asset_metadata(self):
         logger.info('>>> load_asset_metadata')
         asset_library_path = Path(self._asset_library.path)
+        asset_metadata_filepath = Path(asset_library_path, 'asset_metadata.json')
+
+        # load asset metadata
+        asset_metadata_in_files = {}
+        if asset_metadata_filepath.exists():
+            with open(asset_metadata_filepath, 'r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+                for (filepath, asset_metadata_list) in loaded_data.items():
+                    for asset_path, asset_metadata_dict in asset_metadata_list.items():
+                        asset_metadata = AssetMetadata.load(asset_metadata_dict)
+                        filepath = asset_metadata.get_filepath()
+                        if filepath.exists() and filepath.stat().st_mtime <= asset_metadata.get_mtime():
+                            if filepath not in asset_metadata_in_files:
+                                asset_metadata_in_files[filepath] = {}
+                            asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
+
+        # update asset metadata
         for filepath in asset_library_path.glob('**/*.blend'):
+            if filepath in asset_metadata_in_files:
+                continue
+
             utilities.clear_scene()
-            
             with bpy.data.libraries.load(filepath.as_posix(), link=True, assets_only=True) as (data_from, data_to):
-                data_to.objects = data_from.objects
+                data_to.actions = data_from.actions
+                data_to.armatures = data_from.armatures
                 data_to.collections = data_from.collections
                 data_to.materials = data_from.materials
-            
-            data_blocks = [bpy.data.collections, bpy.data.objects, bpy.data.materials]
+                data_to.meshes = data_from.meshes
+                data_to.objects = data_from.objects
+            data_blocks = [bpy.data.actions, bpy.data.armatures, bpy.data.collections, bpy.data.materials, bpy.data.meshes, bpy.data.objects]
             for data_block in data_blocks:
                 for asset in data_block:
                     if asset.asset_data:
@@ -93,12 +115,33 @@ class AssetImportManager:
                             abs_asset_path = Path(self.get_asset_catalog_name_by_id(asset.asset_data.catalog_id), asset.name)
                             asset_type, asset_path = self.get_asset_type_and_name_from_asset_path(abs_asset_path)
                             asset_metadata = AssetMetadata(asset_type, asset_path, filepath)
-                            if asset_type not in self._asset_metadata:
-                                self._asset_metadata[asset_type] = {}
-                            self._asset_metadata[asset_type][asset_path] = asset_metadata
+                            if filepath not in asset_metadata_in_files:
+                                asset_metadata_in_files[filepath] = {}
+                            asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
+
+        # save asset metadata
+        with open(asset_metadata_filepath, 'w', encoding='utf-8') as f:
+            save_data = {}
+            for (filepath, asset_metadata_list) in asset_metadata_in_files.items():
+                filepath = filepath.as_posix()
+                for asset_path, asset_metadata in asset_metadata_list.items():
+                    if filepath not in save_data:
+                        save_data[filepath] = {}
+                    save_data[filepath][asset_path] = asset_metadata.dump()
+            json.dump(save_data, f, indent=4)
+
+        # convert asset metadata
+        self._asset_metadata.clear()
+        for (filepath, asset_metadata_list) in asset_metadata_in_files.items():
+            for asset_path, asset_metadata in asset_metadata_list.items():
+                asset_type = asset_metadata.get_asset_type()
+                if asset_type not in self._asset_metadata:
+                    self._asset_metadata[asset_type] = {}
+                self._asset_metadata[asset_type][asset_path] = asset_metadata
 
     def get_asset_metadata(self, asset_type, asset_name):
-        return self._asset_metadata[asset_type][asset_name]
+        type_asset_metadata = self._asset_metadata.get(asset_type)
+        return type_asset_metadata.get(asset_name) if type_asset_metadata else None
 
     def load_asset(self, asset_type, asset_path):
         asset_metadata = self.get_asset_metadata(asset_type, asset_path)
@@ -107,11 +150,11 @@ class AssetImportManager:
             asset_filepath = asset_metadata.get_filepath().as_posix()
             # link asset
             with bpy.data.libraries.load(asset_filepath, link=True, assets_only=True) as (data_from, data_to):
-                data_to.materials = data_from.materials
-                data_to.meshes = data_from.meshes
-                data_to.collections = data_from.collections
                 data_to.actions = data_from.actions
                 data_to.armatures = data_from.armatures
+                data_to.collections = data_from.collections
+                data_to.materials = data_from.materials
+                data_to.meshes = data_from.meshes
                 data_to.objects = data_from.objects
 
             match asset_metadata.get_asset_type():
@@ -261,7 +304,7 @@ class AssetImportManager:
             utilities.save_as(blend_filepath)
 
             # break for test
-            return
+            # return
         
     def import_assets(self):
         logger.info(f'>>> Begin: import_assets')
@@ -278,6 +321,6 @@ class AssetImportManager:
         self.import_models()
 
         # clear scene
-        #utilities.clear_scene()
+        utilities.clear_scene()
 
         logger.info(f'>>> End: import_assets')

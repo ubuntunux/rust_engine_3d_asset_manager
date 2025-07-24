@@ -65,18 +65,33 @@ ASSET_DESCRIPTOR_TEMPLATE = '''
 }'''
 
 class AssetMetadata:
-    def __init__(self, asset_type, asset_path, filepath):
+    def __init__(self, asset_type, asset_path, filepath, asset_name=None, guid=None, mtime=None):
         self._asset_type = asset_type
         self._asset_path = asset_path
-        self._asset_name = Path(self._asset_path).name
-        self._guid = self.extract_guid(filepath)
-        self._filepath = filepath
-        logger.debug(str(self))
+        self._asset_name = asset_name or Path(asset_path).name
+        self._guid = guid or self.extract_guid(asset_path)
+        self._filepath = Path(filepath)
+        self._mtime = mtime or (self._filepath.stat().st_mtime if self._filepath.exists() else 0)
 
     def __str__(self):
         return f'AssetMetadata(asset_type={self._asset_type}, asset_path={self._asset_path}, asset_name={self._asset_name}, guid={self._guid}, filepath={self._filepath})'
 
+    @staticmethod
+    def load(data):
+        return AssetMetadata(**data)
+
+    def dump(self):
+        return {
+            'asset_type': self._asset_type,
+            'asset_path': self._asset_path,
+            'asset_name': self._asset_name,
+            'guid': self._guid,
+            'filepath': self._filepath.as_posix(),
+            'mtime': self._mtime
+        }
+
     def extract_guid(self, filepath):
+        filepath = Path(filepath)
         meta_filepath = filepath.with_suffix(f'{filepath.suffix}.meta')
         if meta_filepath.exists():
             return re_guid.findall(meta_filepath.read_text())[0]
@@ -110,7 +125,7 @@ class AssetMetadata:
         return self._filepath.exists()
 
     def get_mtime(self):
-        return self._filepath.stat().st_mtime if self._filepath.exists() else 0
+        return self._mtime
 
 class AssetDescriptor:
     def __init__(self, asset_descriptor, asset_type):
