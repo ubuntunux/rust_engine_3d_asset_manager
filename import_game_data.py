@@ -86,7 +86,7 @@ class AssetImportManager:
                 loaded_data = json.load(f)
                 for (filepath, asset_metadata_list) in loaded_data.items():
                     for asset_path, asset_metadata_dict in asset_metadata_list.items():
-                        asset_metadata = AssetMetadata.load(asset_metadata_dict)
+                        asset_metadata = AssetMetadata(**asset_metadata_dict)
                         filepath = asset_metadata.get_filepath()
                         if filepath.exists() and filepath.stat().st_mtime <= asset_metadata.get_mtime():
                             if filepath not in asset_metadata_in_files:
@@ -278,8 +278,7 @@ class AssetImportManager:
             catalog_id = self.get_asset_catalog_id(catalog_name)
             collection = utilities.create_collection_with_asset_mark(asset_name, catalog_id)
 
-            mesh_guid = model.mesh_guid()
-            mesh_asset_metadata = self._asset_descriptor_manager.get_mesh(guid=mesh_guid)
+            mesh_asset_metadata = model.get_mesh()
 
             logger.info(f'asset_name: {asset_name}, catalog_name: {catalog_name}, catalog_id: {catalog_id}')
             logger.info(f'model: {str(model)}, mesh_guid: {mesh_guid}, asset_path: {mesh_asset_metadata}')

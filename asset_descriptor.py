@@ -1,9 +1,44 @@
 import json
 from pathlib import Path
-import re
+from .unity_asset_parser import UnityAssetParser
 
 global logger
-re_guid = re.compile('guid: ([a-fA-F0-9]+)')
+global asset_descriptor_manager
+asset_parser = UnityAssetParser
+
+ASSET_DESCRIPTOR_TEMPLATE = '''
+    "MATERIAL": {
+        "asset_path_infos": [
+            {"asset_path_name": "Materials", "asset_catalog_name": "ProjectName"}
+        ],
+        "suffixes": [".mat"]
+    },
+    "MESH": {
+        "asset_path_infos": [
+            {"asset_path_name": "Models", "asset_catalog_name": "ProjectName"}
+        ],
+        "suffixes": [".fbx"]
+    },
+    "MODEL": {
+        "asset_path_infos": [
+            {"asset_path_name": "Prefabs", "asset_catalog_name": "ProjectName"}
+        ],
+        "suffixes": [".prefab"]
+    },
+    "SCENE": {
+        "asset_path_infos": [
+            {"asset_path_name": "Scenes", "asset_catalog_name": "ProjectName"}
+        ],
+        "suffixes": [".unity"]
+    },
+    "TEXTURE": {
+        "asset_path_infos": [
+            {"asset_path_name": "Textures", "asset_catalog_name": "ProjectName"}
+        ],
+        "suffixes": [".png", ".tga", ".jpeg", ".jpg"]
+    }
+}'''
+
 
 class AssetTypeCatalogNames:
     asset_type_catalog_names = {
@@ -31,80 +66,32 @@ class AssetTypeCatalogNames:
         return cls.asset_type_catalog_names.get(asset_type)
 
 
-ASSET_DESCRIPTOR_TEMPLATE = '''
-    "MATERIAL": {
-        "_asset_path_infos": [
-            {"_asset_path_name": "Materials", "_asset_base_name": "ProjectName"}
-        ],
-        "_exts": [".mat"]
-    },
-    "MESH": {
-        "_asset_path_infos": [
-            {"_asset_path_name": "Models", "_asset_base_name": "ProjectName"}
-        ],
-        "_exts": [".fbx"]
-    },
-    "MODEL": {
-        "_asset_path_infos": [
-            {"_asset_path_name": "Prefabs", "_asset_base_name": "ProjectName"}
-        ],
-        "_exts": [".prefab"]
-    },
-    "SCENE": {
-        "_asset_path_infos": [
-            {"_asset_path_name": "Scenes", "_asset_base_name": "ProjectName"}
-        ],
-        "_exts": [".unity"]
-    },
-    "TEXTURE": {
-        "_asset_path_infos": [
-            {"_asset_path_name": "Textures", "_asset_base_name": "ProjectName"}
-        ],
-        "_exts": [".png", ".tga", ".jpeg", ".jpg"]
-    }
-}'''
-
 class AssetMetadata:
     def __init__(self, asset_type, asset_path, filepath, asset_name=None, guid=None, mtime=None):
         self._asset_type = asset_type
         self._asset_path = asset_path
-        self._asset_name = asset_name or Path(asset_path).name
-        self._guid = guid or self.extract_guid(asset_path)
+        self._asset_name = asset_name
         self._filepath = Path(filepath)
-        self._mtime = mtime or (self._filepath.stat().st_mtime if self._filepath.exists() else 0)
+        self._guid = guid
+        self._mtime = mtime
 
-    def __str__(self):
-        return f'AssetMetadata(asset_type={self._asset_type}, asset_path={self._asset_path}, asset_name={self._asset_name}, guid={self._guid}, filepath={self._filepath})'
-
-    @staticmethod
-    def load(data):
-        return AssetMetadata(**data)
+        # set value
+        if self._asset_name is None:
+            self._asset_name = Path(self._asset_path).name
+        if self._guid is None:
+            self._guid = asset_parser.extract_guid(self._filepath)
+        if self._mtime is None:
+            self._mtime = self._filepath.stat().st_mtime if self._filepath.exists() else 0
 
     def dump(self):
         return {
             'asset_type': self._asset_type,
             'asset_path': self._asset_path,
             'asset_name': self._asset_name,
-            'guid': self._guid,
             'filepath': self._filepath.as_posix(),
+            'guid': self._guid,
             'mtime': self._mtime
         }
-
-    def extract_guid(self, filepath):
-        filepath = Path(filepath)
-        meta_filepath = filepath.with_suffix(f'{filepath.suffix}.meta')
-        if meta_filepath.exists():
-            return re_guid.findall(meta_filepath.read_text())[0]
-        return ''
-
-    def mesh_guid(self):
-        find_mesh_filter = False
-        for line in self._filepath.read_text().split('\n'):
-            if line.strip().startswith('MeshFilter:'):
-                find_mesh_filter = True
-            elif find_mesh_filter and line.strip().startswith('m_Mesh:'):
-                return re_guid.findall(line)[0]
-        return  ''
 
     def get_guid(self):
         return self._guid
@@ -126,6 +113,11 @@ class AssetMetadata:
 
     def get_mtime(self):
         return self._mtime
+
+    def get_mesh(self):
+        mesh_guid = asset_parser.get_mesh_guid(self.get_filepath())
+        return asset_descriptor_manager.get_mesh(guid=mesh_guid)
+
 
 class AssetDescriptor:
     def __init__(self, asset_descriptor, asset_type):
@@ -153,21 +145,25 @@ class AssetDescriptor:
         root_path = self._asset_descriptor.get_root_path()
         my_asset_descriptor_data = asset_descriptor_data.get(self._asset_type, {})
         self._assets = {}
-        for asset_path_info in my_asset_descriptor_data.get('_asset_path_infos', []):
-            asset_directory_path = root_path / asset_path_info.get('_asset_path_name', '')
-            asset_base_name = asset_path_info.get('_asset_base_name', '')
-            for ext in my_asset_descriptor_data.get('_exts', []):
+        for asset_path_info in my_asset_descriptor_data.get('asset_path_infos', []):
+            asset_directory_path = root_path / asset_path_info.get('asset_path_name', '')
+            asset_catalog_name = asset_path_info.get('asset_catalog_name', '')
+            for ext in my_asset_descriptor_data.get('suffixes', []):
                 for filepath in asset_directory_path.rglob(f'*{ext}'):
                     relative_filepath = filepath.relative_to(asset_directory_path)
-                    asset_path = asset_base_name / relative_filepath.with_suffix('')
+                    asset_path = asset_catalog_name / relative_filepath.with_suffix('')
                     asset_metadata = AssetMetadata(self._asset_type, asset_path.as_posix(), filepath)
                     self.register_asset_metadata(asset_metadata)
                     logger.debug(asset_metadata)
+
 
 class AssetDescriptorManager:
     def __init__(self, __logger__, root_path):
         global logger
         logger = __logger__
+
+        global asset_descriptor_manager
+        asset_descriptor_manager = self
 
         self._root_path = Path(root_path)
         self._descriptor_name = self._root_path.stem
@@ -207,9 +203,6 @@ class AssetDescriptorManager:
     def get_materials(self):
         return self._material_descriptor.get_assets()
 
-    def get_material(self, asset_name='', guid=''):
-        return self._material_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
     def get_meshes(self):
         return self._mesh_descriptor.get_assets()
 
@@ -219,17 +212,8 @@ class AssetDescriptorManager:
     def get_models(self):
         return self._model_descriptor.get_assets()
 
-    def get_model(self, asset_name='', guid=''):
-        return self._model_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
     def get_scenes(self):
         return self._scene_descriptor.get_assets()
 
-    def get_scene(self, asset_name='', guid=''):
-        return self._scene_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
     def get_textures(self):
         return self._texture_descriptor.get_assets()
-
-    def get_texture(self, asset_name='', guid=''):
-        return self._texture_descriptor.get_asset(asset_name=asset_name, guid=guid)
