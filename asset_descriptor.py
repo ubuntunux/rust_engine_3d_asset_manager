@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
-from .unity_asset_parser import UnityAssetParser
+from . import unity_asset_parser
 
 global logger
 global asset_descriptor_manager
-asset_parser = UnityAssetParser
+global asset_parser
 
 ASSET_DESCRIPTOR_TEMPLATE = '''
     "MATERIAL": {
@@ -161,6 +161,10 @@ class AssetDescriptorManager:
     def __init__(self, __logger__, root_path):
         global logger
         logger = __logger__
+
+        global asset_parser
+        asset_parser = unity_asset_parser.UnityAssetParser
+        asset_parser.logger = __logger__
 
         global asset_descriptor_manager
         asset_descriptor_manager = self

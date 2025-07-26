@@ -1,30 +1,31 @@
 import re
-import yaml
+from .yaml_parser import YAML
 from pathlib import Path
 
 re_guid = re.compile('guid: ([a-fA-F0-9]+)')
-re_unity_tag = re.compile(r"(%YAML|%TAG|---).+")
 
 class UnityAssetParser:
-    @staticmethod
-    def extract_guid(filepath: Path):
+    logger = None
+
+    @classmethod
+    def extract_guid(cls, filepath: Path):
         if filepath.exists():
             meta_filepath = filepath.with_suffix(f'{filepath.suffix}.meta')
             if meta_filepath.exists():
-                return re_guid.findall(meta_filepath.read_text())[0]
+                metadata = YAML(name='meta', contents=meta_filepath.read_text()).to_dict()
+                return metadata['guid']
         return ''
 
-    @staticmethod
-    def load_yaml(filepath: Path):
+    @classmethod
+    def load_yaml(cls, filepath: Path):
         if filepath.exists():
-            contents = filepath.read_text()
-            contents = '\n'.join([line for line in contents.split('\n') if not re_unity_tag.match(line)])
-            return yaml.safe_load(contents)
+            return YAML(name='YAML', contents=filepath.read_text()).to_dict()
         return {}
 
-    @staticmethod
-    def get_mesh_guid(filepath: Path):
+    @classmethod
+    def get_mesh_guid(cls, filepath: Path):
         prefab_data = UnityAssetParser.load_yaml(filepath)
+        cls.logger.info(prefab_data)
         if 'MeshFilter' in prefab_data:
             return prefab_data['MeshFilter']['m_Mesh']['guid']
         elif 'PrefabInstance' in prefab_data:

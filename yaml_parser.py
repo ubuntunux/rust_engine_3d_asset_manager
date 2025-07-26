@@ -9,7 +9,7 @@ class YAML:
     yaml = YAML(name='YAML', contents=contents)
     data = yaml.to_dict()
     """
-    def __init__(self, parent=None, name='', value=None, prefix='', depth=0, contents=contents):
+    def __init__(self, parent=None, name='', value=None, prefix='', depth=0, contents=''):
         self._parent = parent
         self._depth = depth
         self._name = name
