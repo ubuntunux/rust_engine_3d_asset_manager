@@ -1,10 +1,9 @@
 import json
 from pathlib import Path
-from . import unity_asset_parser
 
-global logger
-global asset_descriptor_manager
-global asset_parser
+global __logger__
+global __asset_descriptor_manager__
+global __asset_parser__
 
 ASSET_DESCRIPTOR_TEMPLATE = '''
     "MATERIAL": {
@@ -67,27 +66,17 @@ class AssetTypeCatalogNames:
 
 
 class AssetMetadata:
-    def __init__(self, asset_type, asset_path, filepath, asset_name=None, guid=None, mtime=None):
+    def __init__(self, asset_type, asset_path, filepath, guid='', mtime=0):
         self._asset_type = asset_type
-        self._asset_path = asset_path
-        self._asset_name = asset_name
+        self._asset_path = Path(asset_path)
         self._filepath = Path(filepath)
         self._guid = guid
         self._mtime = mtime
 
-        # set value
-        if self._asset_name is None:
-            self._asset_name = Path(self._asset_path).name
-        if self._guid is None:
-            self._guid = asset_parser.extract_guid(self.get_filepath())
-        if self._mtime is None:
-            self._mtime = self._filepath.stat().st_mtime if self._filepath.exists() else 0
-
     def dump(self):
         return {
             'asset_type': self._asset_type,
-            'asset_path': self._asset_path,
-            'asset_name': self._asset_name,
+            'asset_path': self._asset_path.as_posix(),
             'filepath': self._filepath.as_posix(),
             'guid': self._guid,
             'mtime': self._mtime
@@ -97,10 +86,10 @@ class AssetMetadata:
         return self._guid
 
     def get_asset_name(self):
-        return self._asset_name
+        return self._asset_path.name
 
     def get_asset_path(self):
-        return self._asset_path
+        return self._asset_path.as_posix()
 
     def get_asset_type(self):
         return self._asset_type
@@ -115,8 +104,7 @@ class AssetMetadata:
         return self._mtime
 
     def get_mesh(self):
-        mesh_guid = asset_parser.get_mesh_guid(self.get_filepath())
-        return asset_descriptor_manager.get_mesh(guid=mesh_guid)
+        return None
 
 
 class AssetDescriptor:
@@ -141,7 +129,7 @@ class AssetDescriptor:
         return None
 
     def process(self, asset_descriptor_data):
-        logger.info(f'AssetDescriptor::process::{self._asset_type}')
+        __logger__.info(f'AssetDescriptor::process::{self._asset_type}')
         root_path = self._asset_descriptor.get_root_path()
         my_asset_descriptor_data = asset_descriptor_data.get(self._asset_type, {})
         self._assets = {}
@@ -152,22 +140,22 @@ class AssetDescriptor:
                 for filepath in asset_directory_path.rglob(f'*{ext}'):
                     relative_filepath = filepath.relative_to(asset_directory_path)
                     asset_path = asset_catalog_name / relative_filepath.with_suffix('')
-                    asset_metadata = AssetMetadata(self._asset_type, asset_path.as_posix(), filepath)
+                    asset_metadata =  __asset_parser__.create_asset_metadata(self._asset_type, asset_path.as_posix(), filepath)
                     self.register_asset_metadata(asset_metadata)
-                    logger.debug(asset_metadata)
+                    __logger__.debug(asset_metadata)
 
 
 class AssetDescriptorManager:
-    def __init__(self, __logger__, root_path):
-        global logger
-        logger = __logger__
+    def __init__(self, logger, root_path):
+        global __logger__
+        __logger__ = logger
 
-        global asset_parser
-        asset_parser = unity_asset_parser.UnityAssetParser
-        unity_asset_parser.logger = __logger__
+        from .unity_asset_parser import UnityAssetParser
+        global __asset_parser__
+        __asset_parser__ = UnityAssetParser(asset_descriptor_manager=self, logger=logger)
 
-        global asset_descriptor_manager
-        asset_descriptor_manager = self
+        global __asset_descriptor_manager__
+        __asset_descriptor_manager__ = self
 
         self._root_path = Path(root_path)
         self._descriptor_name = self._root_path.stem

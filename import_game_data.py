@@ -74,6 +74,17 @@ class AssetImportManager:
             return catalog_id
         return ''
 
+    def make_asset_library(self, asset, asset_type, asset_path, filepath):
+        asset.asset_mark()
+        catalog_name = Path(self.get_asset_catalog_name_by_type(asset_type), asset_path).as_posix()
+        asset.asset_data.catalog_id = self.get_asset_catalog_id(catalog_name)
+        self.register_asset_metadata(asset_type, asset_path, filepath)
+
+    def register_asset_metadata(self, asset_type, asset_path, filepath):
+        if asset_type not in self._asset_metadata:
+            self._asset_metadata[asset_type] = {}
+        self._asset_metadata[asset_type][asset_path] = AssetMetadata(asset_type, asset_path, filepath, mtime=utilities.get_mtime(filepath))
+
     def load_asset_metadata(self):
         logger.info('>>> load_asset_metadata')
         asset_library_path = Path(self._asset_library.path)
@@ -134,10 +145,7 @@ class AssetImportManager:
         self._asset_metadata.clear()
         for (filepath, asset_metadata_list) in asset_metadata_in_files.items():
             for asset_path, asset_metadata in asset_metadata_list.items():
-                asset_type = asset_metadata.get_asset_type()
-                if asset_type not in self._asset_metadata:
-                    self._asset_metadata[asset_type] = {}
-                self._asset_metadata[asset_type][asset_path] = asset_metadata
+                self.register_asset_metadata(asset_metadata.get_asset_type(), asset_metadata.get_asset_path(), filepath)
 
     def get_asset_metadata(self, asset_type, asset_name):
         type_asset_metadata = self._asset_metadata.get(asset_type)
@@ -173,11 +181,10 @@ class AssetImportManager:
 
     def override_material(self, material, material_name, blend_filepath):
         descriptor_name = self._asset_descriptor_manager.get_descriptor_name()
-        catalog_name = self.get_asset_catalog_name_by_type('MATERIAL_INSTANCE') / descriptor_name
-        
         material.name = material_name
-        material.asset_mark()
-        material.asset_data.catalog_id = self.get_asset_catalog_id(catalog_name)
+
+        asset_path = Path(descriptor_name, material.name).as_posix()
+        self.make_asset_library(asset=material, asset_type='MATERIAL_INSTANCE', asset_path=asset_path, filepath=blend_filepath)
         
         for node in material.node_tree.nodes:
             if node.label == 'textureBase':
@@ -226,9 +233,9 @@ class AssetImportManager:
             
             # create a collection
             asset_name = Path(asset_path).name
-            catalog_name = Path(self.get_asset_catalog_name_by_type('MESH'), descriptor_name).as_posix()
-            catalog_id = self.get_asset_catalog_id(catalog_name)
-            collection = utilities.create_collection_with_asset_mark(asset_name, catalog_id)
+            collection = utilities.create_collection(asset_name)
+            asset_path = Path(descriptor_name, asset_name).as_posix()
+            self.make_asset_library(asset=collection, asset_type='MESH', asset_path=asset_path, filepath=blend_filepath)
             
             # default material
             default_material = self.load_default_material()
@@ -274,15 +281,12 @@ class AssetImportManager:
             
             # create a collection
             asset_name = Path(asset_path).name
-            catalog_name = Path(self.get_asset_catalog_name_by_type('MODEL'), descriptor_name).as_posix()
-            catalog_id = self.get_asset_catalog_id(catalog_name)
-            collection = utilities.create_collection_with_asset_mark(asset_name, catalog_id)
+            collection = utilities.create_collection(asset_name)
+
+            asset_path = Path(descriptor_name, asset_name).as_posix()
+            self.make_asset_library(asset=collection, asset_type='MODEL', asset_path=asset_path, filepath=blend_filepath)
 
             mesh_asset_metadata = model.get_mesh()
-
-            logger.info(f'asset_name: {asset_name}, catalog_name: {catalog_name}, catalog_id: {catalog_id}')
-            logger.info(f'model: {str(model)}, mesh_asset_metadata: {mesh_asset_metadata}')
-
             mesh_asset_collection = self.load_asset('MESH', mesh_asset_metadata.get_asset_path())
             override_collection = mesh_asset_collection.override_hierarchy_create(
                 bpy.context.scene,
