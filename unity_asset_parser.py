@@ -23,7 +23,7 @@ class UnityAssetMetadata(AssetMetadata):
         material_guids = []
         if 'MeshRenderer' in self._data:
             for material in self._data['MeshRenderer']['m_Materials']:
-                material_guids.append(material.get('guid'))
+                material_guids.append(material['guid'])
         elif 'PrefabInstance' in self._data:
             for modification in self._data['PrefabInstance']['m_Modification']['m_Modifications']:
                 if modification['propertyPath'].startswith('m_Materials'):

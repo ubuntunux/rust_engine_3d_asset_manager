@@ -2,7 +2,7 @@ import re
 
 re_ignore = re.compile(r"(%YAML|%TAG|---).+")
 re_depth = re.compile(r"([\s-]*)?.+")
-re_values = re.compile(r"{(.+?)}")
+re_dict = re.compile(r"{(.+?)}")
 
 class YAML:
     """
@@ -35,18 +35,23 @@ class YAML:
                 num_depth = int(len(prefix) / 2) + 1
                 name = tokens[0][len(prefix):].strip()
                 value = tokens[1].strip()
+                if name.startswith('{'):
+                    # no-named dict
+                    value = line[len(prefix):].strip()
+                    name = ''
 
                 is_new_list_item = '-' in prefix
                 is_list_value = is_new_list_item or type(self._value) is list
                 if is_list_value:
                     if self._value is None:
                         self._value = []
-                    if is_new_list_item:
+                    if is_new_list_item and name:
+                        # list of dict
                         self._value.append({})
 
                 is_child_value = (value and num_depth == (self._depth + 1)) or (is_list_value and num_depth == (self._depth + 2))
                 if is_child_value:
-                    dict_values = re_values.match(value)
+                    dict_values = re_dict.match(value)
                     if dict_values:
                         value = {}
                         for dict_value in dict_values.groups()[0].split(','):
@@ -54,7 +59,12 @@ class YAML:
                             value[dict_value[0].strip()] = dict_value[1].strip()
                     child = YAML(name=name, value=value, prefix=prefix, depth=num_depth)
                     if is_list_value:
-                        self._value[-1][name] = child
+                        if 0 < len(self._value) and type(self._value[-1]) is dict:
+                            # list of dict
+                            self._value[-1][name] = child
+                        else:
+                            # list
+                            self._value.append(child)
                     else:
                         self.add_child(child)
                 else:
@@ -72,10 +82,15 @@ class YAML:
             if type(child._value) is list:
                 contents[child._name] = []
                 for grand_children in child._value:
-                    grand_child_values = {}
-                    contents[child._name].append(grand_child_values)
-                    for key, grand_child in grand_children.items():
-                        grand_child_values[key] = grand_child._value
+                    if type(grand_children) is dict:
+                        # list of dict
+                        grand_child_values = {}
+                        contents[child._name].append(grand_child_values)
+                        for key, grand_child in grand_children.items():
+                            grand_child_values[key] = grand_child._value
+                    else:
+                        # list
+                        contents[child._name].append(grand_children._value)
             elif child._value:
                 contents[child._name] = child._value
             else:
