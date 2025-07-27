@@ -281,7 +281,7 @@ class AssetImportManager:
             mesh_asset_metadata = model.get_mesh()
 
             logger.info(f'asset_name: {asset_name}, catalog_name: {catalog_name}, catalog_id: {catalog_id}')
-            logger.info(f'model: {str(model)}, asset_path: {mesh_asset_metadata}')
+            logger.info(f'model: {str(model)}, mesh_asset_metadata: {mesh_asset_metadata}')
 
             mesh_asset_collection = self.load_asset('MESH', mesh_asset_metadata.get_asset_path())
             override_collection = mesh_asset_collection.override_hierarchy_create(

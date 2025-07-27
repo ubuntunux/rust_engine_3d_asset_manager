@@ -79,7 +79,7 @@ class AssetMetadata:
         if self._asset_name is None:
             self._asset_name = Path(self._asset_path).name
         if self._guid is None:
-            self._guid = asset_parser.extract_guid(self._filepath)
+            self._guid = asset_parser.extract_guid(self.get_filepath())
         if self._mtime is None:
             self._mtime = self._filepath.stat().st_mtime if self._filepath.exists() else 0
 
@@ -164,7 +164,7 @@ class AssetDescriptorManager:
 
         global asset_parser
         asset_parser = unity_asset_parser.UnityAssetParser
-        asset_parser.logger = __logger__
+        unity_asset_parser.logger = __logger__
 
         global asset_descriptor_manager
         asset_descriptor_manager = self

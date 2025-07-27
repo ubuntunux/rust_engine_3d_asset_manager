@@ -44,7 +44,8 @@ class YAML:
                     if is_new_list_item:
                         self._value.append({})
 
-                if value:
+                is_child_value = (value and num_depth == (self._depth + 1)) or (is_list_value and num_depth == (self._depth + 2))
+                if is_child_value:
                     dict_values = re_values.match(value)
                     if dict_values:
                         value = {}
@@ -59,10 +60,7 @@ class YAML:
                 else:
                     if self._depth < num_depth:
                         child = YAML(name=name, prefix=prefix, depth=num_depth)
-                        if is_list_value:
-                            self._value[-1][name] = child
-                        else:
-                            self.add_child(child)
+                        self.add_child(child)
                         child.build_dict(lines=lines, num_lines=num_lines)
                     else:
                         lines.insert(0, line)
@@ -71,19 +69,15 @@ class YAML:
     def to_dict(self):
         contents = {}
         for child in self._children.values():
-            if child._value:
-                if type(child._value) is list:
-                    contents[child._name] = []
-                    for grand_children in child._value:
-                        grand_child_values = {}
-                        contents[child._name].append(grand_child_values)
-                        for key, grand_child in grand_children.items():
-                            if grand_child._value:
-                                grand_child_values[grand_child._name] = grand_child._value
-                            else:
-                                grand_child_values[grand_child._name] = grand_child.to_dict()
-                else:
-                    contents[child._name] = child._value
+            if type(child._value) is list:
+                contents[child._name] = []
+                for grand_children in child._value:
+                    grand_child_values = {}
+                    contents[child._name].append(grand_child_values)
+                    for key, grand_child in grand_children.items():
+                        grand_child_values[key] = grand_child._value
+            elif child._value:
+                contents[child._name] = child._value
             else:
                 contents[child._name] = child.to_dict()
         return contents
