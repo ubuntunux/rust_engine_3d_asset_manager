@@ -1,6 +1,5 @@
 import re
 
-from . import utilities
 from .asset_descriptor import AssetMetadata
 from .yaml_parser import YAML
 from pathlib import Path
@@ -17,21 +16,33 @@ class UnityAssetMetadata(AssetMetadata):
         self._data = {}
 
         # load data
-        if asset_type in ['MODEL', 'SCENE']:
+        if asset_type in ['MATERIAL_INSTANCE', 'MODEL', 'SCENE']:
             self._data = UnityAssetParser.load_yaml(self._filepath)
 
-    def get_mesh_guid(self):
-        if 'MeshFilter' in self._data:
-            return self._data['MeshFilter']['m_Mesh']['guid']
+    def get_material_instances(self):
+        material_guids = []
+        if 'MeshRenderer' in self._data:
+            for material in self._data['MeshRenderer']['m_Materials']:
+                material_guids.append(material.get('guid'))
         elif 'PrefabInstance' in self._data:
-            return self._data['PrefabInstance']['m_SourcePrefab']['guid']
-
-        msg = f'Unknown prefab data: {self._filepath}'
-        __logger__.error(msg)
-        raise ValueError(msg)
+            for modification in self._data['PrefabInstance']['m_Modification']['m_Modifications']:
+                if modification['propertyPath'].startswith('m_Materials'):
+                    material_guids.append(modification['objectReference']['guid'])
+        else:
+            msg = f'Unknown prefab data: {self._filepath}'
+            __logger__.error(msg)
+            raise ValueError(msg)
+        return [__asset_descriptor_manager__.get_material_instance(guid=guid) for guid in material_guids]
 
     def get_mesh(self):
-        mesh_guid = self.get_mesh_guid()
+        if 'MeshFilter' in self._data:
+            mesh_guid = self._data['MeshFilter']['m_Mesh']['guid']
+        elif 'PrefabInstance' in self._data:
+            mesh_guid = self._data['PrefabInstance']['m_SourcePrefab']['guid']
+        else:
+            msg = f'Unknown prefab data: {self._filepath}'
+            __logger__.error(msg)
+            raise ValueError(msg)
         return __asset_descriptor_manager__.get_mesh(guid=mesh_guid)
 
 
@@ -60,13 +71,10 @@ class UnityAssetParser:
         return {}
 
     def create_asset_metadata(self, asset_type, asset_path, filepath):
-        guid = self.extract_guid(filepath)
-        mtime = utilities.get_mtime(filepath)
         return UnityAssetMetadata(
             asset_type=asset_type,
             asset_path=asset_path,
             filepath=filepath,
-            guid=guid,
-            mtime=mtime
+            guid=self.extract_guid(filepath)
         )
 

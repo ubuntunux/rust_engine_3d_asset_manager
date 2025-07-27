@@ -8,11 +8,12 @@ import bpy
 from . import utilities
 from .asset_descriptor import AssetMetadata, AssetTypeCatalogNames
 
+global __logger__
     
 class AssetImportManager:
-    def __init__(self, __logger__, asset_library_name, asset_descriptor_manager):
-        global logger
-        logger = __logger__
+    def __init__(self, logger, asset_library_name, asset_descriptor_manager):
+        global __logger__
+        __logger__ = logger
 
         asset_library = bpy.context.preferences.filepaths.asset_libraries[asset_library_name]
         self._asset_library = asset_library
@@ -34,7 +35,7 @@ class AssetImportManager:
         raise ValueError(f'Unknown asset type: {target_asset_path}')
 
     def load_asset_catalogs(self):  
-        logger.info('>>> load_asset_catalogs')
+        __logger__.info('>>> load_asset_catalogs')
         # asset_catalog_name_id_map
         contents = self._asset_catalogs_filepath.read_text().split('\n')
         for content in contents:
@@ -43,7 +44,7 @@ class AssetImportManager:
             uuid, catalog_name, catalog_simple_name = content.strip().split(':')
             self._asset_catalog_ids[catalog_name] = uuid
             self._asset_catalog_name_id_map[uuid] = catalog_name
-            logger.debug(f'{uuid}: {catalog_name}')
+            __logger__.debug(f'{uuid}: {catalog_name}')
 
         # asset_catalog_name_type_map
         for asset_type_name in AssetTypeCatalogNames.get_asset_type_names():
@@ -76,17 +77,19 @@ class AssetImportManager:
 
     def make_asset_library(self, asset, asset_type, asset_path, filepath):
         asset.asset_mark()
-        catalog_name = Path(self.get_asset_catalog_name_by_type(asset_type), asset_path).as_posix()
+        catalog_name = Path(self.get_asset_catalog_name_by_type(asset_type), asset_path).parent.as_posix()
         asset.asset_data.catalog_id = self.get_asset_catalog_id(catalog_name)
-        self.register_asset_metadata(asset_type, asset_path, filepath)
+        return self.register_asset_metadata(asset_type, asset_path, filepath)
 
     def register_asset_metadata(self, asset_type, asset_path, filepath):
         if asset_type not in self._asset_metadata:
             self._asset_metadata[asset_type] = {}
-        self._asset_metadata[asset_type][asset_path] = AssetMetadata(asset_type, asset_path, filepath, mtime=utilities.get_mtime(filepath))
+        asset_metadata = AssetMetadata(asset_type, asset_path, filepath)
+        self._asset_metadata[asset_type][asset_path] = asset_metadata
+        return asset_metadata
 
     def load_asset_metadata(self):
-        logger.info('>>> load_asset_metadata')
+        __logger__.info('>>> load_asset_metadata')
         asset_library_path = Path(self._asset_library.path)
         asset_metadata_filepath = Path(asset_library_path, 'asset_metadata.json')
 
@@ -130,22 +133,28 @@ class AssetImportManager:
                                 asset_metadata_in_files[filepath] = {}
                             asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
 
-        # save asset metadata
-        with open(asset_metadata_filepath, 'w', encoding='utf-8') as f:
-            save_data = {}
-            for (filepath, asset_metadata_list) in asset_metadata_in_files.items():
-                filepath = filepath.as_posix()
-                for asset_path, asset_metadata in asset_metadata_list.items():
-                    if filepath not in save_data:
-                        save_data[filepath] = {}
-                    save_data[filepath][asset_path] = asset_metadata.dump()
-            json.dump(save_data, f, indent=4)
-
         # convert asset metadata
         self._asset_metadata.clear()
         for (filepath, asset_metadata_list) in asset_metadata_in_files.items():
             for asset_path, asset_metadata in asset_metadata_list.items():
                 self.register_asset_metadata(asset_metadata.get_asset_type(), asset_metadata.get_asset_path(), filepath)
+
+        # save to file
+        self.save_asset_metadata()
+
+    def save_asset_metadata(self):
+        __logger__.info('>>> save_asset_metadata')
+        asset_library_path = Path(self._asset_library.path)
+        asset_metadata_filepath = Path(asset_library_path, 'asset_metadata.json')
+        with open(asset_metadata_filepath, 'w', encoding='utf-8') as f:
+            save_data = {}
+            for (asset_type, asset_metadata_list) in self._asset_metadata.items():
+                for asset_path, asset_metadata in asset_metadata_list.items():
+                    filepath = asset_metadata.get_filepath().as_posix()
+                    if filepath not in save_data:
+                        save_data[filepath] = {}
+                    save_data[filepath][asset_path] = asset_metadata.dump()
+            json.dump(save_data, f, indent=4)
 
     def get_asset_metadata(self, asset_type, asset_name):
         type_asset_metadata = self._asset_metadata.get(asset_type)
@@ -192,7 +201,7 @@ class AssetImportManager:
                 image_data = bpy.data.images.load(filepath=texture_filepath, check_existing=True)
                 image_data.filepath = bpy.path.relpath(texture_filepath)
                 node.image = image_data
-                logger.debug(node.image.filepath)
+                __logger__.debug(node.image.filepath)
             elif node.label == 'textureMaterial':
                 pass
             elif node.label == 'textureNormal':
@@ -202,20 +211,19 @@ class AssetImportManager:
     def import_textures(self):
         textures_path = Path(self._asset_library.path, 'textures')
         textures = self._asset_descriptor_manager.get_textures().values()
-        logger.info(f'>>> import_textures: {len(textures)}')
+        __logger__.info(f'>>> import_textures: {len(textures)}')
         for texture in textures:
             ext = texture.get_filepath().suffix
             dst_texture_filepath = Path(textures_path, texture.get_asset_path()).with_suffix(ext)
             if utilities.get_mtime(dst_texture_filepath) < texture.get_mtime():
-                logger.info(f'copy {dst_texture_filepath} -> {texture.get_filepath()}')
+                __logger__.info(f'copy {dst_texture_filepath} -> {texture.get_filepath()}')
                 utilities.copy(texture.get_filepath(), dst_texture_filepath)
 
     def import_meshes(self):
         mesh_path = Path(self._asset_library.path, 'meshes')
         meshes = self._asset_descriptor_manager.get_meshes().values()
-        descriptor_name = self._asset_descriptor_manager.get_descriptor_name()
 
-        logger.info(f'>>> import_meshes: {len(meshes)}')
+        __logger__.info(f'>>> import_meshes: {len(meshes)}')
         for mesh in meshes:
             utilities.clear_scene()
 
@@ -225,7 +233,7 @@ class AssetImportManager:
                 continue
             
             # save
-            logger.info(f'save mesh: {blend_filepath}')
+            __logger__.info(f'save mesh: {blend_filepath}')
             utilities.save_as(blend_filepath)
             
             # import fbx
@@ -234,8 +242,7 @@ class AssetImportManager:
             # create a collection
             asset_name = Path(asset_path).name
             collection = utilities.create_collection(asset_name)
-            asset_path = Path(descriptor_name, asset_name).as_posix()
-            self.make_asset_library(asset=collection, asset_type='MESH', asset_path=asset_path, filepath=blend_filepath)
+            msh_asset_metadata = self.make_asset_library(asset=collection, asset_type='MESH', asset_path=asset_path, filepath=blend_filepath)
             
             # default material
             default_material = self.load_default_material()
@@ -264,8 +271,9 @@ class AssetImportManager:
     def import_models(self):
         model_path = Path(self._asset_library.path, 'models')
         models = self._asset_descriptor_manager.get_models().values()
-        descriptor_name = self._asset_descriptor_manager.get_descriptor_name()
-        logger.info(f'>>> import_models: {len(models)}')
+        __logger__.info(f'>>> import_models: {len(models)}')
+
+        shaders = set()
         
         for model in models:
             utilities.clear_scene()
@@ -276,16 +284,15 @@ class AssetImportManager:
                 continue
             
             # save
-            logger.info(f'save model: {blend_filepath}')
+            __logger__.info(f'save model: {blend_filepath}')
             utilities.save_as(blend_filepath)
             
             # create a collection
             asset_name = Path(asset_path).name
             collection = utilities.create_collection(asset_name)
-
-            asset_path = Path(descriptor_name, asset_name).as_posix()
             self.make_asset_library(asset=collection, asset_type='MODEL', asset_path=asset_path, filepath=blend_filepath)
 
+            # link mesh and override
             mesh_asset_metadata = model.get_mesh()
             mesh_asset_collection = self.load_asset('MESH', mesh_asset_metadata.get_asset_path())
             override_collection = mesh_asset_collection.override_hierarchy_create(
@@ -295,6 +302,14 @@ class AssetImportManager:
             )
             bpy.context.scene.collection.children.unlink(override_collection)
             collection.children.link(override_collection)
+
+            material_instances = model.get_material_instances()
+            __logger__.info(f'model: {model.get_asset_path()}')
+            for (i, material_instance) in enumerate(material_instances):
+                shader_guid = material_instance._data['Material']['m_Shader']['guid'] if material_instance else '0'
+                shaders.add(shader_guid)
+                __logger__.info(f'    [{i}] material: {material_instance.get_asset_path() if material_instance else "None"}, shader: {shader_guid}')
+
 
             # set material
             # for material_slot in obj.material_slots:
@@ -306,11 +321,10 @@ class AssetImportManager:
             collection.asset_generate_preview()
             utilities.save_as(blend_filepath)
 
-            # break for test
-            # return
+        __logger__.info(f'>>> shaders: {shaders}')
         
     def import_assets(self):
-        logger.info(f'>>> Begin: import_assets')
+        __logger__.info(f'>>> Begin: import_assets')
 
         # initialize
         self.initialize()
@@ -323,7 +337,7 @@ class AssetImportManager:
         self.import_meshes()
         self.import_models()
 
-        # clear scene
+        # close
         utilities.clear_scene()
-
-        logger.info(f'>>> End: import_assets')
+        self.save_asset_metadata()
+        __logger__.info(f'>>> End: import_assets')

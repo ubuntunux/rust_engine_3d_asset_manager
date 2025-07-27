@@ -1,12 +1,14 @@
 import json
 from pathlib import Path
 
+from . import utilities
+
 global __logger__
 global __asset_descriptor_manager__
 global __asset_parser__
 
 ASSET_DESCRIPTOR_TEMPLATE = '''
-    "MATERIAL": {
+    "MATERIAL_INSTANCE": {
         "asset_path_infos": [
             {"asset_path_name": "Materials", "asset_catalog_name": "ProjectName"}
         ],
@@ -66,20 +68,20 @@ class AssetTypeCatalogNames:
 
 
 class AssetMetadata:
-    def __init__(self, asset_type, asset_path, filepath, guid='', mtime=0):
+    def __init__(self, asset_type, asset_path, filepath, guid='', mtime=None):
         self._asset_type = asset_type
         self._asset_path = Path(asset_path)
         self._filepath = Path(filepath)
         self._guid = guid
-        self._mtime = mtime
+        self._mtime = mtime or utilities.get_mtime(self._filepath)
 
     def dump(self):
         return {
-            'asset_type': self._asset_type,
-            'asset_path': self._asset_path.as_posix(),
+            'asset_type': self.get_asset_type(),
+            'asset_path': self.get_asset_path(),
             'filepath': self._filepath.as_posix(),
-            'guid': self._guid,
-            'mtime': self._mtime
+            'guid': self.get_guid(),
+            'mtime': self.get_mtime()
         }
 
     def get_guid(self):
@@ -103,8 +105,13 @@ class AssetMetadata:
     def get_mtime(self):
         return self._mtime
 
+    def update_mtime(self):
+        self._mtime = utilities.get_mtime(self._filepath)
+        return self._mtime
+
     def get_mesh(self):
         return None
+
 
 
 class AssetDescriptor:
@@ -160,7 +167,7 @@ class AssetDescriptorManager:
         self._root_path = Path(root_path)
         self._descriptor_name = self._root_path.stem
         self._asset_descriptor_filepath = Path(self._root_path, 'asset_descriptor.json')
-        self._material_descriptor = AssetDescriptor(self, asset_type='MATERIAL')
+        self._material_instance_descriptor = AssetDescriptor(self, asset_type='MATERIAL_INSTANCE')
         self._mesh_descriptor = AssetDescriptor(self, asset_type='MESH')
         self._model_descriptor = AssetDescriptor(self, asset_type='MODEL')
         self._scene_descriptor = AssetDescriptor(self, asset_type='SCENE')
@@ -181,7 +188,7 @@ class AssetDescriptorManager:
 
         # Process each asset type
         self._texture_descriptor.process(asset_descriptor_data)
-        self._material_descriptor.process(asset_descriptor_data)
+        self._material_instance_descriptor.process(asset_descriptor_data)
         self._mesh_descriptor.process(asset_descriptor_data)
         self._model_descriptor.process(asset_descriptor_data)
         self._scene_descriptor.process(asset_descriptor_data)
@@ -192,8 +199,11 @@ class AssetDescriptorManager:
     def get_root_path(self):
         return self._root_path
 
-    def get_materials(self):
-        return self._material_descriptor.get_assets()
+    def get_material_instances(self):
+        return self._material_instance_descriptor.get_assets()
+
+    def get_material_instance(self, asset_name='', guid=''):
+        return self._material_instance_descriptor.get_asset(asset_name=asset_name, guid=guid)
 
     def get_meshes(self):
         return self._mesh_descriptor.get_assets()
@@ -204,8 +214,17 @@ class AssetDescriptorManager:
     def get_models(self):
         return self._model_descriptor.get_assets()
 
+    def get_model(self, asset_name='', guid=''):
+        return self._model_descriptor.get_asset(asset_name=asset_name, guid=guid)
+
     def get_scenes(self):
         return self._scene_descriptor.get_assets()
 
+    def get_scene(self, asset_name='', guid=''):
+        return self._scene_descriptor.get_asset(asset_name=asset_name, guid=guid)
+
     def get_textures(self):
         return self._texture_descriptor.get_assets()
+
+    def get_texture(self, asset_name='', guid=''):
+        return self._texture_descriptor.get_asset(asset_name=asset_name, guid=guid)
