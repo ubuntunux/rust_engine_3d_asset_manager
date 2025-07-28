@@ -298,13 +298,14 @@ class AssetImportManager:
             bpy.context.scene.collection.children.unlink(override_collection)
             collection.children.link(override_collection)
 
-            material_instances = model.get_material_instances()
+            material_instances = model.get_data(AssetTypes.MATERIAL_INSTANCE)
             __logger__.info(f'model: {model.get_asset_path()}')
             for (i, material_instance) in enumerate(material_instances):
-                material_data = material_instance.get_data('Material')
-                shader_guid = material_data['m_Shader']['guid'] if material_instance else '0'
-                shaders.add(shader_guid)
-                __logger__.info(f'    [{i}] material: {material_instance.get_asset_path() if material_instance else "None"}, shader: {shader_guid}')
+                __logger__.info(f'    [{i}] material: {material_instance}')
+                # material_data = material_instance.get_data('Material')
+                # shader_guid = material_data['m_Shader']['guid'] if material_instance else '0'
+                # shaders.add(shader_guid)
+                # __logger__.info(f'    [{i}] material: {material_instance.get_asset_path() if material_instance else "None"}, shader: {shader_guid}')
 
             # set material
             # for material_slot in obj.material_slots:
