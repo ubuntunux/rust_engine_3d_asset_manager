@@ -7,6 +7,19 @@ global __logger__
 global __asset_descriptor_manager__
 global __asset_parser__
 
+class AssetTypes:
+    MATERIAL = 'MATERIAL'
+    MATERIAL_INSTANCE = 'MATERIAL_INSTANCE'
+    MESH = 'MESH'
+    MODEL = 'MODEL'
+    SCENE = 'SCENE'
+    TEXTURE = 'TEXTURE'
+
+    @classmethod
+    def get_types(cls):
+        return [key for key in AssetTypes.__dict__.keys() if key.isupper()]
+
+
 ASSET_DESCRIPTOR_TEMPLATE = '''
     "MATERIAL_INSTANCE": {
         "asset_path_infos": [
@@ -68,12 +81,16 @@ class AssetTypeCatalogNames:
 
 
 class AssetMetadata:
-    def __init__(self, asset_type, asset_path, filepath, guid='', mtime=None):
+    def __init__(self, asset_type='', asset_path='', filepath='', guid='', mtime=None, data=None):
         self._asset_type = asset_type
         self._asset_path = Path(asset_path)
         self._filepath = Path(filepath)
         self._guid = guid
         self._mtime = mtime or utilities.get_mtime(self._filepath)
+        self._data = data if data else {}
+
+    def process(self):
+        pass
 
     def dump(self):
         return {
@@ -81,7 +98,8 @@ class AssetMetadata:
             'asset_path': self.get_asset_path(),
             'filepath': self._filepath.as_posix(),
             'guid': self.get_guid(),
-            'mtime': self.get_mtime()
+            'mtime': self.get_mtime(),
+            'data': self._data,
         }
 
     def get_guid(self):
@@ -109,47 +127,15 @@ class AssetMetadata:
         self._mtime = utilities.get_mtime(self._filepath)
         return self._mtime
 
-    def get_mesh(self):
-        return None
+    def get_data(self, key):
+        return self._data.get(key)
+
+    def set_data(self, key, value):
+        self._data[key] = value
 
 
-
-class AssetDescriptor:
-    def __init__(self, asset_descriptor, asset_type):
-        self._asset_descriptor = asset_descriptor
-        self._asset_type = asset_type
-        self._assets = {}
-        self._assets_by_guid = {}
-
-    def register_asset_metadata(self, asset):
-        self._assets[asset.get_asset_path()] = asset
-        self._assets_by_guid[asset.get_guid()] = asset
-
-    def get_assets(self):
-        return self._assets
-
-    def get_asset(self, asset_name='', guid=''):
-        if asset_name:
-            return self._assets.get(asset_name)
-        elif guid:
-            return self._assets_by_guid.get(guid)
-        return None
-
-    def process(self, asset_descriptor_data):
-        __logger__.info(f'AssetDescriptor::process::{self._asset_type}')
-        root_path = self._asset_descriptor.get_root_path()
-        my_asset_descriptor_data = asset_descriptor_data.get(self._asset_type, {})
-        self._assets = {}
-        for asset_path_info in my_asset_descriptor_data.get('asset_path_infos', []):
-            asset_directory_path = root_path / asset_path_info.get('asset_path_name', '')
-            asset_catalog_name = asset_path_info.get('asset_catalog_name', '')
-            for ext in my_asset_descriptor_data.get('suffixes', []):
-                for filepath in asset_directory_path.rglob(f'*{ext}'):
-                    relative_filepath = filepath.relative_to(asset_directory_path)
-                    asset_path = asset_catalog_name / relative_filepath.with_suffix('')
-                    asset_metadata =  __asset_parser__.create_asset_metadata(self._asset_type, asset_path.as_posix(), filepath)
-                    self.register_asset_metadata(asset_metadata)
-                    __logger__.debug(asset_metadata)
+class AssetParser:
+    pass
 
 
 class AssetDescriptorManager:
@@ -166,12 +152,18 @@ class AssetDescriptorManager:
 
         self._root_path = Path(root_path)
         self._descriptor_name = self._root_path.stem
+        self._asset_metadata_filepath = Path(self._root_path, 'asset_metadata.json')
         self._asset_descriptor_filepath = Path(self._root_path, 'asset_descriptor.json')
-        self._material_instance_descriptor = AssetDescriptor(self, asset_type='MATERIAL_INSTANCE')
-        self._mesh_descriptor = AssetDescriptor(self, asset_type='MESH')
-        self._model_descriptor = AssetDescriptor(self, asset_type='MODEL')
-        self._scene_descriptor = AssetDescriptor(self, asset_type='SCENE')
-        self._texture_descriptor = AssetDescriptor(self, asset_type='TEXTURE')
+        self._asset_metadata_by_types = {}
+
+    def close(self):
+        self.save_asset_metadata()
+
+    def get_root_path(self):
+        return self._root_path
+
+    def get_descriptor_name(self):
+        return self._descriptor_name
 
     def get_asset_descriptor_filepath(self):
         return self._asset_descriptor_filepath.as_posix()
@@ -183,48 +175,56 @@ class AssetDescriptorManager:
         self._asset_descriptor_filepath.write_text(ASSET_DESCRIPTOR_TEMPLATE)
         return self.get_asset_descriptor_filepath()
 
+    def get_asset_metadata_list(self, asset_type):
+        return self._asset_metadata_by_types[asset_type]
+
+    def get_asset_metadata(self, asset_type, asset_path):
+        if asset_type in self._asset_metadata_by_types:
+            return self._asset_metadata_by_types[asset_type].get(asset_path)
+        return None
+
+    def get_asset_metadata_by_guid(self, asset_type, guid):
+        for asset_metadata in self.get_asset_metadata_list(asset_type).values():
+            if asset_metadata.get_guid() == guid:
+                return asset_metadata
+        return None
+
+    def register_asset_metadata(self, asset_metadata):
+        asset_type = asset_metadata.get_asset_type()
+        if asset_type not in self._asset_metadata_by_types:
+            self._asset_metadata_by_types[asset_type] = {}
+        self._asset_metadata_by_types[asset_type][asset_metadata.get_asset_path()] = asset_metadata
+
     def process(self):
+        __logger__.info(f'AssetDescriptorManager::process')
         asset_descriptor_data = json.loads(self._asset_descriptor_filepath.read_text())
 
-        # Process each asset type
-        self._texture_descriptor.process(asset_descriptor_data)
-        self._material_instance_descriptor.process(asset_descriptor_data)
-        self._mesh_descriptor.process(asset_descriptor_data)
-        self._model_descriptor.process(asset_descriptor_data)
-        self._scene_descriptor.process(asset_descriptor_data)
+        self.load_asset_metadata()
 
-    def get_descriptor_name(self):
-        return self._descriptor_name
+        __asset_parser__.process(asset_descriptor_data)
 
-    def get_root_path(self):
-        return self._root_path
+        self.save_asset_metadata()
 
-    def get_material_instances(self):
-        return self._material_instance_descriptor.get_assets()
+    def load_asset_metadata(self):
+        __logger__.info('>>> load_asset_metadata')
+        self._asset_metadata_by_types.clear()
+        if self._asset_metadata_filepath.exists():
+            with open(self._asset_metadata_filepath, 'r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+                for (asset_type, asset_metadata_list) in loaded_data.items():
+                    for asset_path, asset_metadata_dict in asset_metadata_list.items():
+                        asset_metadata = AssetMetadata(**asset_metadata_dict)
+                        filepath = asset_metadata.get_filepath()
+                        if filepath.exists() and filepath.stat().st_mtime <= asset_metadata.get_mtime():
+                            self.register_asset_metadata(asset_metadata)
 
-    def get_material_instance(self, asset_name='', guid=''):
-        return self._material_instance_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
-    def get_meshes(self):
-        return self._mesh_descriptor.get_assets()
-
-    def get_mesh(self, asset_name='', guid=''):
-        return self._mesh_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
-    def get_models(self):
-        return self._model_descriptor.get_assets()
-
-    def get_model(self, asset_name='', guid=''):
-        return self._model_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
-    def get_scenes(self):
-        return self._scene_descriptor.get_assets()
-
-    def get_scene(self, asset_name='', guid=''):
-        return self._scene_descriptor.get_asset(asset_name=asset_name, guid=guid)
-
-    def get_textures(self):
-        return self._texture_descriptor.get_assets()
-
-    def get_texture(self, asset_name='', guid=''):
-        return self._texture_descriptor.get_asset(asset_name=asset_name, guid=guid)
+    def save_asset_metadata(self):
+        __logger__.info('>>> save_asset_metadata')
+        with open(self._asset_metadata_filepath, 'w', encoding='utf-8') as f:
+            save_data = {}
+            for (asset_type, asset_metadata_list) in self._asset_metadata_by_types.items():
+                for asset_path, asset_metadata in asset_metadata_list.items():
+                    if asset_type not in save_data:
+                        save_data[asset_type] = {}
+                    save_data[asset_type][asset_path] = asset_metadata.dump()
+            json.dump(save_data, f, indent=4)

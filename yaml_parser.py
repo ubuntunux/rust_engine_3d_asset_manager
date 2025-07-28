@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 re_ignore = re.compile(r"(%YAML|%TAG|---).+")
 re_depth = re.compile(r"([\s-]*)?.+")
@@ -20,6 +21,12 @@ class YAML:
         if contents:
             lines = contents.split('\n')
             self.build_dict(lines=lines, num_lines=len(lines))
+
+    @staticmethod
+    def load_yaml(filepath: Path):
+        if filepath.exists():
+            return YAML(name='YAML', contents=filepath.read_text(encoding='utf-8')).to_dict()
+        return {}
 
     def add_child(self, child):
         child._parent = self
