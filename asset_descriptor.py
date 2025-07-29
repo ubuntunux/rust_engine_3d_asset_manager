@@ -196,14 +196,14 @@ class AssetDescriptorManager:
         self._asset_metadata_by_types[asset_type][asset_metadata.get_asset_path()] = asset_metadata
 
     def process(self):
-        __logger__.info(f'AssetDescriptorManager::process')
+        __logger__.info(f'AssetDescriptorManager::process: {self._asset_descriptor_filepath}')
         self.load_asset_metadata()
         asset_descriptor_data = json.loads(self._asset_descriptor_filepath.read_text())
         __asset_parser__.process(asset_descriptor_data)
         self.save_asset_metadata()
 
     def load_asset_metadata(self):
-        __logger__.info('>>> load_asset_metadata')
+        __logger__.info(f'>>> load_asset_metadata: {self._asset_metadata_filepath}')
         self._asset_metadata_by_types.clear()
         if self._asset_metadata_filepath.exists():
             with open(self._asset_metadata_filepath, 'r', encoding='utf-8') as f:
@@ -216,7 +216,7 @@ class AssetDescriptorManager:
                             self.register_asset_metadata(asset_metadata)
 
     def save_asset_metadata(self):
-        __logger__.info('>>> save_asset_metadata')
+        __logger__.info(f'>>> save_asset_metadata: {self._asset_metadata_filepath}')
         with open(self._asset_metadata_filepath, 'w', encoding='utf-8') as f:
             save_data = {}
             for (asset_type, asset_metadata_list) in self._asset_metadata_by_types.items():

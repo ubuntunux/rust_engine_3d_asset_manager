@@ -90,7 +90,7 @@ class AssetImportManager:
         return asset_metadata
 
     def load_asset_metadata(self):
-        __logger__.info('>>> load_asset_metadata')
+        __logger__.info(f'>>> load_asset_metadata: {self._asset_metadata_filepath}')
         asset_metadata_in_files = {}
         if self._asset_metadata_filepath.exists():
             with open(self._asset_metadata_filepath, 'r', encoding='utf-8') as f:
@@ -105,7 +105,7 @@ class AssetImportManager:
                             asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
 
         # update asset metadata
-        for filepath in self._asset_metadata_filepath.glob('**/*.blend'):
+        for filepath in self._asset_metadata_filepath.parent.glob('**/*.blend'):
             if filepath in asset_metadata_in_files:
                 continue
 
@@ -125,9 +125,15 @@ class AssetImportManager:
                         if library_path == filepath.as_posix():
                             abs_asset_path = Path(self.get_asset_catalog_name_by_id(asset.asset_data.catalog_id), asset.name)
                             asset_type, asset_path = self.get_asset_type_and_name_from_asset_path(abs_asset_path)
-                            asset_metadata = AssetMetadata(asset_type=asset_type, asset_path=asset_path, filepath=filepath)
+                            asset_metadata = AssetMetadata(
+                                asset_type=asset_type,
+                                asset_path=asset_path,
+                                filepath=filepath,
+                                mtime=utilities.get_mtime(filepath)
+                            )
                             if filepath not in asset_metadata_in_files:
                                 asset_metadata_in_files[filepath] = {}
+                            __logger__.info(f'register asset metadata: {asset_metadata.get_asset_path()} - {filepath}')
                             asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
 
         # convert asset metadata
@@ -140,7 +146,7 @@ class AssetImportManager:
         self.save_asset_metadata()
 
     def save_asset_metadata(self):
-        __logger__.info('>>> save_asset_metadata')
+        __logger__.info(f'>>> save_asset_metadata: {self._asset_metadata_filepath}')
         with open(self._asset_metadata_filepath, 'w', encoding='utf-8') as f:
             save_data = {}
             for (asset_type, asset_metadata_list) in self._asset_metadata.items():
@@ -151,9 +157,9 @@ class AssetImportManager:
                     save_data[filepath][asset_path] = asset_metadata.dump()
             json.dump(save_data, f, indent=4)
 
-    def get_asset_metadata(self, asset_type, asset_name):
+    def get_asset_metadata(self, asset_type, asset_path):
         type_asset_metadata = self._asset_metadata.get(asset_type)
-        return type_asset_metadata.get(asset_name) if type_asset_metadata else None
+        return type_asset_metadata.get(asset_path) if type_asset_metadata else None
 
     def load_asset(self, asset_type, asset_path):
         asset_metadata = self.get_asset_metadata(asset_type, asset_path)
@@ -177,6 +183,9 @@ class AssetImportManager:
                         if collection.name == asset_name:
                             return collection
             return None
+
+        type_asset_metadata = self._asset_metadata.get(asset_type)
+        __logger__.info(f'{list(type_asset_metadata.keys()), asset_path in type_asset_metadata}')
 
         raise ValueError(f'Unknown asset: {asset_path}')
 
@@ -301,11 +310,10 @@ class AssetImportManager:
             material_instances = model.get_data(AssetTypes.MATERIAL_INSTANCE)
             __logger__.info(f'model: {model.get_asset_path()}')
             for (i, material_instance) in enumerate(material_instances):
-                __logger__.info(f'    [{i}] material: {material_instance}')
-                # material_data = material_instance.get_data('Material')
-                # shader_guid = material_data['m_Shader']['guid'] if material_instance else '0'
-                # shaders.add(shader_guid)
-                # __logger__.info(f'    [{i}] material: {material_instance.get_asset_path() if material_instance else "None"}, shader: {shader_guid}')
+                material_data = material_instance.get_data('Material')
+                shader_guid = material_data['m_Shader']['guid'] if material_instance else '0'
+                shaders.add(shader_guid)
+                __logger__.info(f'    [{i}] material: {material_instance.get_asset_path() if material_instance else "None"}, shader: {shader_guid}')
 
             # set material
             # for material_slot in obj.material_slots:
