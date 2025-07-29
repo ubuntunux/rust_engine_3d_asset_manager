@@ -8,6 +8,13 @@ global __asset_descriptor_manager__
 global __asset_parser__
 
 class AssetTypes:
+    ANIMATION_LAYER = 'ANIMATION_LAYER'
+    GAME_CHARACTER = 'GAME_CHARACTER'
+    GAME_DATA = 'GAME_DATA'
+    GAME_SCENE = 'GAME_SCENE'
+    GAME_ITEM = 'GAME_ITEM'
+    GAME_PROP = 'GAME_PROP'
+    GAME_WEAPON = 'GAME_WEAPON'
     MATERIAL = 'MATERIAL'
     MATERIAL_INSTANCE = 'MATERIAL_INSTANCE'
     MESH = 'MESH'
@@ -70,19 +77,19 @@ ASSET_DESCRIPTOR_TEMPLATE = '''
 
 class AssetTypeCatalogNames:
     asset_type_catalog_names = {
-        'ANIMATION_LAYER': 'animation_layers',
-        'GAME_CHARACTER': 'game_data/characters',
-        'GAME_DATA': 'game_data/data',
-        'GAME_SCENE': 'game_data/game_scenes',
-        'GAME_ITEM': 'game_data/items',
-        'GAME_PROP': 'game_data/props',
-        'GAME_WEAPON': 'game_data/weapons',
-        'MATERIAL_INSTANCE': 'material_instances',
-        'MATERIAL': 'materials',
-        'MESH': 'meshes',
-        'MODEL': 'models',
-        'SCENE': 'scenes',
-        'TEXTURE': 'textures'
+        AssetTypes.ANIMATION_LAYER: 'animation_layers',
+        AssetTypes.GAME_CHARACTER: 'game_data/characters',
+        AssetTypes.GAME_DATA: 'game_data/data',
+        AssetTypes.GAME_SCENE: 'game_data/game_scenes',
+        AssetTypes.GAME_ITEM: 'game_data/items',
+        AssetTypes.GAME_PROP: 'game_data/props',
+        AssetTypes.GAME_WEAPON: 'game_data/weapons',
+        AssetTypes.MATERIAL_INSTANCE: 'material_instances',
+        AssetTypes.MATERIAL: 'materials',
+        AssetTypes.MESH: 'meshes',
+        AssetTypes.MODEL: 'models',
+        AssetTypes.SCENE: 'scenes',
+        AssetTypes.TEXTURE: 'textures'
     }
 
     @classmethod
