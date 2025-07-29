@@ -88,7 +88,7 @@ class UnityAssetParser(AssetParser):
                 for ext in descriptor_data.get('suffixes', []):
                     for filepath in asset_directory_path.rglob(f'*{ext}'):
                         relative_filepath = filepath.relative_to(asset_directory_path)
-                        asset_path = asset_catalog_name / relative_filepath.with_suffix('')
+                        asset_path = Path(asset_catalog_name, relative_filepath.with_suffix('')).as_posix()
                         asset_metadata = __asset_descriptor_manager__.get_asset_metadata(asset_type=asset_type, asset_path=asset_path)
                         if asset_metadata is None:
                             asset_metadata = AssetMetadata(
@@ -101,4 +101,4 @@ class UnityAssetParser(AssetParser):
                             )
                             self.process_asset_data(asset_metadata)
                             __asset_descriptor_manager__.register_asset_metadata(asset_metadata)
-                            __logger__.info(f'process asset_metadata: {filepath}')
+                            __logger__.info(f'process get_asset_metadata: {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')

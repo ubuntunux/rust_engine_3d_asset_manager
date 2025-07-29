@@ -197,12 +197,9 @@ class AssetDescriptorManager:
 
     def process(self):
         __logger__.info(f'AssetDescriptorManager::process')
-        asset_descriptor_data = json.loads(self._asset_descriptor_filepath.read_text())
-
         self.load_asset_metadata()
-
+        asset_descriptor_data = json.loads(self._asset_descriptor_filepath.read_text())
         __asset_parser__.process(asset_descriptor_data)
-
         self.save_asset_metadata()
 
     def load_asset_metadata(self):
