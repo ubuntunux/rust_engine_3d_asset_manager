@@ -176,18 +176,15 @@ class AssetDescriptorManager:
         return self.get_asset_descriptor_filepath()
 
     def get_asset_metadata_list(self, asset_type):
-        return self._asset_metadata_by_types[asset_type]
+        return self._asset_metadata_by_types.get(asset_type, {})
 
-    def get_asset_metadata(self, asset_type, asset_path):
-        if asset_type in self._asset_metadata_by_types:
-            return self._asset_metadata_by_types[asset_type].get(asset_path)
-        return None
+    def get_asset_metadata(self, asset_type, asset_path=None, guid=None):
+        if guid:
+            for asset_metadata in self.get_asset_metadata_list(asset_type).values():
+                if asset_metadata.get_guid() == guid:
+                    return asset_metadata
 
-    def get_asset_metadata_by_guid(self, asset_type, guid):
-        for asset_metadata in self.get_asset_metadata_list(asset_type).values():
-            if asset_metadata.get_guid() == guid:
-                return asset_metadata
-        return None
+        return self.get_asset_metadata_list(asset_type).get(asset_path)
 
     def register_asset_metadata(self, asset_metadata):
         asset_type = asset_metadata.get_asset_type()

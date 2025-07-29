@@ -276,7 +276,7 @@ class AssetImportManager:
         models = self._asset_descriptor_manager.get_asset_metadata_list(AssetTypes.MODEL).values()
         __logger__.info(f'>>> import_models: {len(models)}')
 
-        shaders = set()
+        shader_guid_list = set()
         
         for model in models:
             utilities.clear_scene()
@@ -306,13 +306,11 @@ class AssetImportManager:
             bpy.context.scene.collection.children.unlink(override_collection)
             collection.children.link(override_collection)
 
+            materials = model.get_data(AssetTypes.MATERIAL)
             material_instances = model.get_data(AssetTypes.MATERIAL_INSTANCE)
-            __logger__.info(f'model: {model.get_asset_path()}')
-            for (i, material_instance) in enumerate(material_instances):
-                material_data = material_instance.get_data('Material')
-                shader_guid = material_data['m_Shader']['guid'] if material_instance else '0'
-                shaders.add(shader_guid)
-                __logger__.info(f'    [{i}] material: {material_instance.get_asset_path() if material_instance else "None"}, shader: {shader_guid}')
+            for (i, material_instance_asset_path) in enumerate(material_instances):
+                shader_guid = materials[i]
+                shader_guid_list.add(shader_guid)
 
             # set material
             # for material_slot in obj.material_slots:
@@ -324,7 +322,7 @@ class AssetImportManager:
             collection.asset_generate_preview()
             utilities.save_as(blend_filepath)
 
-        __logger__.info(f'>>> shaders: {shaders}')
+        __logger__.info(f'>>> shader_guid_list: {shader_guid_list}')
         
     def import_assets(self):
         __logger__.info(f'>>> Begin: import_assets')
