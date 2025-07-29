@@ -133,7 +133,6 @@ class AssetImportManager:
                             )
                             if filepath not in asset_metadata_in_files:
                                 asset_metadata_in_files[filepath] = {}
-                            __logger__.info(f'register asset metadata: {asset_metadata.get_asset_path()} - {filepath}')
                             asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
 
         # convert asset metadata
