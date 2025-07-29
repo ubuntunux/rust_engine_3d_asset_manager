@@ -21,37 +21,51 @@ class AssetTypes:
 
 
 ASSET_DESCRIPTOR_TEMPLATE = '''
+{
+    "MATERIAL": {
+        "material_create_infos": {
+            "0000000000000000f000000000000000": {
+                "asset_path": "PolygonNatureBiomes/Standard",
+                "m_TexEnvs": ["_MainTex", "_BumpMap", "_EmissionMap"],
+                "m_Colors": ["_Color"],
+                "m_Floats": ["_Glossiness", "_Metallic"]
+            }
+        },
+        "suffixes": []
+    },
     "MATERIAL_INSTANCE": {
         "asset_path_infos": [
-            {"asset_path_name": "Materials", "asset_catalog_name": "ProjectName"}
+            {"import_path": "Materials", "asset_catalog_name": "PolygonNatureBiomes"}
         ],
         "suffixes": [".mat"]
     },
     "MESH": {
         "asset_path_infos": [
-            {"asset_path_name": "Models", "asset_catalog_name": "ProjectName"}
+            {"import_path": "Models", "asset_catalog_name": "PolygonNatureBiomes"}
         ],
         "suffixes": [".fbx"]
     },
     "MODEL": {
         "asset_path_infos": [
-            {"asset_path_name": "Prefabs", "asset_catalog_name": "ProjectName"}
+            {"import_path": "Prefabs", "asset_catalog_name": "PolygonNatureBiomes"}
         ],
         "suffixes": [".prefab"]
     },
     "SCENE": {
         "asset_path_infos": [
-            {"asset_path_name": "Scenes", "asset_catalog_name": "ProjectName"}
+            {"import_path": "Scenes", "asset_catalog_name": "PolygonNatureBiomes"}
         ],
         "suffixes": [".unity"]
     },
     "TEXTURE": {
         "asset_path_infos": [
-            {"asset_path_name": "Textures", "asset_catalog_name": "ProjectName"}
+            {"import_path": "Terrain", "asset_catalog_name": "PolygonNatureBiomes/Terrain"},
+            {"import_path": "Textures", "asset_catalog_name": "PolygonNatureBiomes"}
         ],
         "suffixes": [".png", ".tga", ".jpeg", ".jpg"]
     }
-}'''
+}
+'''
 
 
 class AssetTypeCatalogNames:

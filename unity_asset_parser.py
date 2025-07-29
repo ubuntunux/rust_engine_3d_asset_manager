@@ -101,7 +101,7 @@ class UnityAssetParser(AssetParser):
         for asset_type in AssetTypes.get_types():
             descriptor_data = asset_descriptor_data.get(asset_type, {})
             for asset_path_info in descriptor_data.get('asset_path_infos', []):
-                asset_directory_path = root_path / asset_path_info.get('asset_path_name', '')
+                asset_directory_path = root_path / asset_path_info.get('import_path', '')
                 asset_catalog_name = asset_path_info.get('asset_catalog_name', '')
                 for ext in descriptor_data.get('suffixes', []):
                     for filepath in asset_directory_path.rglob(f'*{ext}'):
