@@ -74,8 +74,9 @@ def create_collection(collection_name):
     return c
 
 def move_to_collection(collection, obj):
-    bpy.context.scene.collection.objects.unlink(obj)
-    collection.objects.link(obj)
+    if obj.name in bpy.context.scene.collection.objects:
+        bpy.context.scene.collection.objects.unlink(obj)
+        collection.objects.link(obj)
 
 def save_as(filepath):
     if not filepath.parent.exists():

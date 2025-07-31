@@ -25,7 +25,12 @@ class YAML:
     @staticmethod
     def load_yaml(filepath: Path):
         if filepath.exists():
-            return YAML(name='YAML', contents=filepath.read_text(encoding='utf-8')).to_dict()
+
+            for encoding in ['utf-8', 'cp949', 'utf-16']:
+                try:
+                    return YAML(name='YAML', contents=filepath.read_text(encoding=encoding)).to_dict()
+                except:
+                    pass
         return {}
 
     def add_child(self, child):

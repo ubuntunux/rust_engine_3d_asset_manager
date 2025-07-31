@@ -189,7 +189,7 @@ class AssetImportManager:
         raise ValueError(f'Unknown asset: {asset_path}')
 
     def load_default_material(self):
-        return self.load_asset('MATERIAL', 'common/render_static_object')
+        return self.load_asset(AssetTypes.MATERIAL, 'common/render_static_object')
 
     def override_material(self, material, material_name, blend_filepath):
         descriptor_name = self._asset_descriptor_manager.get_descriptor_name()
@@ -245,7 +245,7 @@ class AssetImportManager:
             # create a collection
             asset_name = Path(asset_path).name
             collection = utilities.create_collection(asset_name)
-            msh_asset_metadata = self.make_asset_library(asset=collection, asset_type=AssetTypes.MESH, asset_path=asset_path, filepath=blend_filepath)
+            self.make_asset_library(asset=collection, asset_type=AssetTypes.MESH, asset_path=asset_path, filepath=blend_filepath)
             
             # default material
             default_material = self.load_default_material()
@@ -274,10 +274,7 @@ class AssetImportManager:
     def import_models(self):
         model_path = Path(self._asset_library.path, 'models')
         models = self._asset_descriptor_manager.get_asset_metadata_list(AssetTypes.MODEL).values()
-        __logger__.info(f'>>> import_models: {len(models)}')
 
-        shader_guid_list = set()
-        
         for model in models:
             utilities.clear_scene()
 
@@ -306,23 +303,29 @@ class AssetImportManager:
             bpy.context.scene.collection.children.unlink(override_collection)
             collection.children.link(override_collection)
 
-            materials = model.get_data(AssetTypes.MATERIAL)
-            material_instances = model.get_data(AssetTypes.MATERIAL_INSTANCE)
-            for (i, material_instance_asset_path) in enumerate(material_instances):
-                shader_guid = materials[i]
-                shader_guid_list.add(shader_guid)
+            material_paths = model.get_data(AssetTypes.MATERIAL)
+            material_instance_paths = model.get_data(AssetTypes.MATERIAL_INSTANCE)
 
-            # set material
-            # for material_slot in obj.material_slots:
-            #     material_slot.link = 'OBJECT'
-            #     material_slot.material = default_material.copy()
-            #     self.override_material(material_slot.material, obj.name, blend_filepath)
+
+            for obj in bpy.context.scene.objects:
+                # select object
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                bpy.context.view_layer.objects.active = obj
+
+                # move to a collection
+                utilities.move_to_collection(collection, obj)
+
+                # set material
+                # for (i, material_slot) in enumerate(obj.material_slots):
+                #     material = self.load_asset(AssetTypes.MATERIAL, material_paths[i])
+                #     material_instance_path = material_instance_paths[i]
+                #     material_slot.link = 'OBJECT'
+                #     material_slot.material = material.copy()
             
             # save final
             collection.asset_generate_preview()
             utilities.save_as(blend_filepath)
-
-        __logger__.info(f'>>> shader_guid_list: {shader_guid_list}')
         
     def import_assets(self):
         __logger__.info(f'>>> Begin: import_assets')
