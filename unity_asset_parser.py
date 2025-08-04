@@ -3,7 +3,9 @@ from pathlib import Path
 
 from . import utilities
 from .asset_descriptor import AssetMetadata, AssetTypes, AssetParser
+from . import yaml_parser
 from .yaml_parser import YAML
+
 
 global __logger__
 global __asset_descriptor_manager__
@@ -16,6 +18,7 @@ class UnityAssetParser(AssetParser):
     def __init__(self, asset_descriptor_manager, logger):
         global __logger__
         __logger__ = logger
+        yaml_parser.__logger__ = logger
         global __asset_parser__
         __asset_parser__ = self
         global __asset_descriptor_manager__
@@ -26,8 +29,9 @@ class UnityAssetParser(AssetParser):
     def extract_guid(filepath: Path):
         if filepath.exists():
             meta_filepath = filepath.with_suffix(f'{filepath.suffix}.meta')
+            __logger__.info(f'>>> YAML.load_yaml: {meta_filepath}')
             metadata = YAML.load_yaml(meta_filepath)
-            return metadata['guid']
+            return metadata.get_child('guid').get_value()
         return ''
 
     @staticmethod
@@ -35,6 +39,7 @@ class UnityAssetParser(AssetParser):
         return dict([(key, eval(value)) for key, value in value.items()])
 
     def process_asset_data(self, asset_descriptor_data, asset_metadata):
+        __logger__.info(f'>>> YAML.load_yaml: {asset_metadata.get_filepath()}')
         yaml_data = YAML.load_yaml(asset_metadata.get_filepath())
         match(asset_metadata.get_asset_type()):
             case AssetTypes.MATERIAL:
@@ -62,58 +67,71 @@ class UnityAssetParser(AssetParser):
     @staticmethod
     def process_material_and_parameters(asset_descriptor_data, yaml_data):
         parameters = {}
-        material_guid = yaml_data['Material']['m_Shader']['guid']
+        material_guid = yaml_data.get_child('Material').get_child('m_Shader').get('guid')
         material_create_info = asset_descriptor_data[AssetTypes.MATERIAL]['material_create_infos'][material_guid]
         parameters[AssetTypes.MATERIAL] = material_create_info['asset_path']
 
         parameters[AssetTypes.TEXTURE] = {}
-        m_TexEnvs = yaml_data['Material']['m_SavedProperties'].get('m_TexEnvs', [])
-        __logger__.info(f'AssetTypes.TEXTURE: {m_TexEnvs}')
+        m_TexEnvs = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_TexEnvs').get_value()
         for m_TexEnv in m_TexEnvs:
-            for parameter_name, value in m_TexEnv.items():
-                if parameter_name in material_create_info['m_TexEnvs']:
-                    texture_guid = value['m_Texture'].get('guid', '0')
-                    parameters[AssetTypes.TEXTURE][parameter_name] = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.TEXTURE, guid=texture_guid).get_asset_path()
+            __logger__.info(f'>>> m_TexEnv: {m_TexEnv}')
+            if m_TexEnv.get_name() in material_create_info['m_TexEnvs']:
+                texture_guid = m_TexEnv.get_child('m_Texture').get('guid', '0')
+                parameters[AssetTypes.TEXTURE][m_TexEnv.get_name()] = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.TEXTURE, guid=texture_guid).get_asset_path()
 
         parameters[AssetTypes.COLOR] = {}
-        m_Colors = yaml_data['Material']['m_SavedProperties'].get('m_Colors', [])
+        m_Colors = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_Colors').get_value()
         for m_Color in m_Colors:
-            for parameter_name, value in m_Color.items():
+            for parameter_name, color_data in m_Color.items():
                 if parameter_name in material_create_info['m_Colors']:
-                    color = UnityAssetParser.extract_color(value)
-                    parameters[AssetTypes.COLOR][parameter_name] = color
+                    parameters[AssetTypes.COLOR][parameter_name] = UnityAssetParser.extract_color(color_data.get_value())
 
         parameters[AssetTypes.FLOAT] = {}
-        m_Floats = yaml_data['Material']['m_SavedProperties'].get('m_Floats', [])
+        m_Floats = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_Floats').get_value()
         for m_Float in m_Floats:
-            for parameter_name, value in m_Float.items():
+            for parameter_name, float_data in m_Float.items():
                 if parameter_name in material_create_info['m_Floats']:
-                    parameters[AssetTypes.FLOAT][parameter_name] = float(value)
+                    parameters[AssetTypes.FLOAT][parameter_name] = float(float_data.get_value())
 
         return parameters
 
     @staticmethod
     def process_material_instances(yaml_data):
         material_guids = []
-        if 'MeshRenderer' in yaml_data:
-            for material in yaml_data['MeshRenderer']['m_Materials']:
-                material_guids.append(material['guid'])
-        elif 'PrefabInstance' in yaml_data:
-            for modification in yaml_data['PrefabInstance']['m_Modification']['m_Modifications']:
-                if modification['propertyPath'].startswith('m_Materials'):
-                    material_guids.append(modification['objectReference']['guid'])
+        MeshRenderer = yaml_data.get_child('MeshRenderer')
+        PrefabInstance = yaml_data.get_child('PrefabInstance')
+        if MeshRenderer:
+            for material in MeshRenderer.get_child('m_Materials').get_value():
+                guid = material.get('guid')
+                if guid is None:
+                    __logger__.error(f'process_material_instances - MeshRenderer.m_Materials.guid: {guid}, value: {material}')
+                material_guids.append(material.get('guid'))
+        elif PrefabInstance:
+            for modification in PrefabInstance.get_child('m_Modification').get_child('m_Modifications').get_value():
+                if modification.get('propertyPath').get_value().startswith('m_Materials'):
+                    guid = modification.get('objectReference').get('guid')
+                    if guid is None:
+                        __logger__.error(f'process_material_instances - PrefabInstance.m_Modification.m_Modifications.objectReference.guid: {guid}, value: {modification.get_child("objectReference")}')
+                    material_guids.append(guid)
         else:
             msg = f'Unknown yaml data: {yaml_data}'
             __logger__.error(msg)
             raise ValueError(msg)
+
+        for guid in material_guids:
+            asset_metadata = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, guid=guid)
+            if asset_metadata is None:
+                __logger__.error(f'process_material_instances - guid: {guid}')
         return [__asset_descriptor_manager__.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, guid=guid).get_asset_path() for guid in material_guids]
 
     @staticmethod
     def process_mesh(yaml_data):
-        if 'MeshFilter' in yaml_data:
-            mesh_guid = yaml_data['MeshFilter']['m_Mesh']['guid']
-        elif 'PrefabInstance' in yaml_data:
-            mesh_guid = yaml_data['PrefabInstance']['m_SourcePrefab']['guid']
+        MeshFilter = yaml_data.get_child('MeshFilter')
+        PrefabInstance = yaml_data.get_child('PrefabInstance')
+        if MeshFilter:
+            mesh_guid = MeshFilter.get_child('m_Mesh').get('guid')
+        elif PrefabInstance:
+            mesh_guid = PrefabInstance.get_child('m_SourcePrefab').get('guid')
         else:
             msg = f'Unknown yaml data: {yaml_data}'
             __logger__.error(msg)
@@ -148,7 +166,7 @@ class UnityAssetParser(AssetParser):
                             )
                             asset_metadata_list.append(asset_metadata)
                             __asset_descriptor_manager__.register_asset_metadata(asset_metadata)
-                            __logger__.info(f'register_asset_metadata: {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
+                            __logger__.info(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
             # MATERIAL: material_create_infos
             if AssetTypes.MATERIAL == asset_type:
                 for (material_guid, material_create_info) in descriptor_data.get('material_create_infos', {}).items():
@@ -165,10 +183,10 @@ class UnityAssetParser(AssetParser):
                         )
                         asset_metadata_list.append(asset_metadata)
                         __asset_descriptor_manager__.register_asset_metadata(asset_metadata)
-                        __logger__.info(f'register_asset_metadata: {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
+                        __logger__.info(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
 
         # process_asset_data
-        for (asset_type, asset_metadata_list) in new_asset_metadata_list_by_types.items():
-            for asset_metadata in asset_metadata_list:
+        for asset_type in [AssetTypes.MATERIAL, AssetTypes.MATERIAL_INSTANCE, AssetTypes.MODEL, AssetTypes.SCENE]:
+            for asset_metadata in new_asset_metadata_list_by_types[asset_type]:
                 self.process_asset_data(asset_descriptor_data, asset_metadata)
 

@@ -38,6 +38,30 @@ ASSET_DESCRIPTOR_TEMPLATE = '''
                 "m_TexEnvs": ["_MainTex", "_BumpMap", "_EmissionMap"],
                 "m_Colors": ["_Color"],
                 "m_Floats": ["_Glossiness", "_Metallic"]
+            },
+            "276a39a5a210b124885f0eff3e80f1f3": {
+                "asset_path": "PolygonNatureBiomes/WaterShader",
+                "m_TexEnvs": ["_DistortionMap", "_FoamMask", "_Refraction", "_WaterNormal", "_WaveMask"],
+                "m_Colors": ["_DeepColour", "_FoamColor"],
+                "m_Floats": ["_Glossiness", "_Metallic", "_Tiling", "_Opacity", "_waveTime"]
+            },
+            "6697e1f185bc8b840a2f02567abf15b5": {
+                "asset_path": "PolygonNatureBiomes/VegetationShader",
+                "m_TexEnvs": ["_EmissiveMask", "_GustNoiseMap", "_LeafNormalMap", "_LeafTex", "_TrunkNormalMap", "_TunkTex"],
+                "m_Colors": ["_BaseColour", "_EmissiveColour", "_TrunkBaseColour"],
+                "m_Floats": ["_TrunkSmoothness", "_LeafSmoothness", "_GustFreq", "_GustLargeFreq", "_GustScale", "_GustSmallFreq"]
+            },
+            "66f8401a4c881134f8803eceae302347": {
+                "asset_path": "PolygonNatureBiomes/TriplanarBasic",
+                "m_TexEnvs": ["_Top", "_TopNormal", "_Sides", "_SidesNormal"],
+                "m_Colors": ["_Color"],
+                "m_Floats": ["_Glossiness", "_Metallic"]
+            },
+            "b79e425cce5c90642a8dd66b6852353e": {
+                "asset_path": "PolygonNatureBiomes/SkyBoxUnlit",
+                "m_TexEnvs": [],
+                "m_Colors": ["_ColorBottom", "_ColorTop"],
+                "m_Floats": []
             }
         },
         "suffixes": []

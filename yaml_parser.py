@@ -5,6 +5,8 @@ re_ignore = re.compile(r"(%YAML|%TAG|---).+")
 re_depth = re.compile(r"([\s-]*)?.+")
 re_dict = re.compile(r"{(.+?)}")
 
+__logger__ = None
+
 class YAML:
     """
     yaml = YAML(name='YAML', contents=contents)
@@ -15,7 +17,7 @@ class YAML:
         self._depth = depth
         self._name = name
         self._value = value
-        self._children = {}
+        self._children = []
         self._prefix = prefix
 
         if contents:
@@ -25,30 +27,53 @@ class YAML:
     @staticmethod
     def load_yaml(filepath: Path):
         if filepath.exists():
-
             for encoding in ['utf-8', 'cp949', 'utf-16']:
                 try:
-                    return YAML(name='YAML', contents=filepath.read_text(encoding=encoding)).to_dict()
+                    return YAML(name='YAML', contents=filepath.read_text(encoding=encoding))
                 except:
                     pass
+        __logger__.info(f'failed to load yaml file: {filepath}')
         return {}
+
+    def get(self, key, default_value=None):
+        return self._value.get(key, default_value)
+
+    def get_name(self):
+        return self._name
+
+    def get_value(self):
+        return self._value
 
     def add_child(self, child):
         child._parent = self
-        self._children[child._name] = child
+        self._children.append(child)
         return child
+
+    def get_child(self, name=None):
+        for child in self._children:
+            if name is None or child._name == name:
+                return child
+        return None
+
+    def get_children(self, name=None):
+        return [child for child in self._children if name is None or child._name == name]
 
     def build_dict(self, lines=[], num_lines=0):
         while lines:
             line = lines.pop(0)
             tokens = line.split(':', 1)
-            if line and not re_ignore.match(line) and len(tokens) == 2:
+            if line and not re_ignore.match(line):
                 prefix = re_depth.findall(line)[0]
                 num_depth = int(len(prefix) / 2) + 1
-                name = tokens[0][len(prefix):].strip()
-                value = tokens[1].strip()
+                if len(tokens) == 2:
+                    name = tokens[0][len(prefix):].strip()
+                    value = tokens[1].strip()
+                else:
+                    name = ''
+                    value = line[len(prefix):].strip()
+
+                # no-named dict
                 if name.startswith('{'):
-                    # no-named dict
                     value = line[len(prefix):].strip()
                     name = ''
 
@@ -62,6 +87,9 @@ class YAML:
                         self._value.append({})
 
                 is_child_value = (value and num_depth == (self._depth + 1)) or (is_list_value and num_depth == (self._depth + 2))
+
+                __logger__.info(f'[{num_lines - len(lines)}]: {line}, depth: {num_depth}, name: {name}, value: {value}, is_list: {is_list_value}, is_child: {is_child_value}')
+
                 if is_child_value:
                     dict_values = re_dict.match(value)
                     if dict_values:
@@ -69,19 +97,24 @@ class YAML:
                         for dict_value in dict_values.groups()[0].split(','):
                             dict_value = dict_value.split(':', 1)
                             value[dict_value[0].strip()] = dict_value[1].strip()
+                            __logger__.info(f'    add dict value - name: {dict_value[0].strip()}, value: {dict_value[1].strip()}')
                     child = YAML(name=name, value=value, prefix=prefix, depth=num_depth)
                     if is_list_value:
                         if 0 < len(self._value) and type(self._value[-1]) is dict:
                             # list of dict
                             self._value[-1][name] = child
+                            __logger__.info(f'    append list of dict - name: {name}, value: {value}')
                         else:
                             # list
                             self._value.append(child)
+                            __logger__.info(f'    append list value - name: {name}, value: {value}')
                     else:
                         self.add_child(child)
+                        __logger__.info(f'    add list child - name: {name}, value: {value}')
                 else:
                     if self._depth < num_depth:
                         child = YAML(name=name, prefix=prefix, depth=num_depth)
+                        __logger__.info(f'    add child - name: {name}, value: {value}')
                         self.add_child(child)
                         child.build_dict(lines=lines, num_lines=num_lines)
                     else:
@@ -90,7 +123,7 @@ class YAML:
 
     def to_dict(self):
         contents = {}
-        for child in self._children.values():
+        for child in self._children:
             if type(child._value) is list:
                 contents[child._name] = []
                 for grand_children in child._value:
