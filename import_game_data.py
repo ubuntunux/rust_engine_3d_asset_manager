@@ -199,7 +199,7 @@ class AssetImportManager:
         self.make_asset_library(asset=material, asset_type='MATERIAL_INSTANCE', asset_path=asset_path, filepath=blend_filepath)
         
         for node in material.node_tree.nodes:
-            if node.label == 'textureBase':
+            if node.label == '_MainTex':
                 texture_filepath = Path(self._asset_library.path, 'textures/PolygonNatureBiomes/Terrain/Rock_Texture_01.png').as_posix()
                 image_data = bpy.data.images.load(filepath=texture_filepath, check_existing=True)
                 image_data.filepath = bpy.path.relpath(texture_filepath)
@@ -248,7 +248,11 @@ class AssetImportManager:
             self.make_asset_library(asset=collection, asset_type=AssetTypes.MESH, asset_path=asset_path, filepath=blend_filepath)
             
             # default material
-            default_material = self.load_default_material()
+            set_default_material = False
+            if set_default_material:
+                default_material = self.load_default_material()
+            else:
+                default_material = None
             
             # make mesh
             for obj in bpy.context.scene.objects:
@@ -261,11 +265,12 @@ class AssetImportManager:
                 utilities.move_to_collection(collection, obj)
                 
                 # set material
-                for material_slot in obj.material_slots:
-                    material_slot.link = 'DATA'
-                    material_slot.material = default_material
-                    material_slot.link = 'OBJECT'
-                    material_slot.material = default_material
+                if set_default_material:
+                    for material_slot in obj.material_slots:
+                        material_slot.link = 'DATA'
+                        material_slot.material = default_material
+                        material_slot.link = 'OBJECT'
+                        material_slot.material = default_material
             
             # save final
             collection.asset_generate_preview()
@@ -295,17 +300,21 @@ class AssetImportManager:
             # link mesh and override
             mesh_asset_path = model.get_data(AssetTypes.MESH)
             mesh_asset_collection = self.load_asset(asset_type=AssetTypes.MESH, asset_path=mesh_asset_path)
-            override_collection = mesh_asset_collection.override_hierarchy_create(
-                bpy.context.scene,
-                bpy.context.view_layer,
-                do_fully_editable=True
-            )
+            override_collection = mesh_asset_collection.override_hierarchy_create(bpy.context.scene, bpy.context.view_layer, do_fully_editable=True)
+            for obj in override_collection.objects:
+                if obj.data:
+                    obj.data.override_create(remap_local_usages=True)
             bpy.context.scene.collection.children.unlink(override_collection)
             collection.children.link(override_collection)
 
-            material_paths = model.get_data(AssetTypes.MATERIAL)
-            material_instance_paths = model.get_data(AssetTypes.MATERIAL_INSTANCE)
-
+            # collect material
+            material_instances = []
+            material_paths = []
+            for material_instance_path in model.get_data(AssetTypes.MATERIAL_INSTANCE):
+                material_instance = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, asset_path=material_instance_path)
+                material_path = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.MATERIAL, asset_path=material_instance.get_data(AssetTypes.MATERIAL))
+                material_paths.append(material_path.get_asset_path())
+                material_instances.append(material_instance)
 
             for obj in bpy.context.scene.objects:
                 # select object
@@ -317,11 +326,14 @@ class AssetImportManager:
                 utilities.move_to_collection(collection, obj)
 
                 # set material
-                # for (i, material_slot) in enumerate(obj.material_slots):
-                #     material = self.load_asset(AssetTypes.MATERIAL, material_paths[i])
-                #     material_instance_path = material_instance_paths[i]
-                #     material_slot.link = 'OBJECT'
-                #     material_slot.material = material.copy()
+                for (i, material_slot) in enumerate(obj.material_slots):
+                    material = self.load_asset(AssetTypes.MATERIAL, material_paths[i])
+                    material_instance_path = material_instances[i].get_asset_path()
+                    material_slot.link = 'DATA'
+                    material_slot.material = material
+                    material_slot.link = 'OBJECT'
+                    material_slot.material = material.copy()
+                    self.override_material(material_slot.material, material_instance_path, blend_filepath)
             
             # save final
             collection.asset_generate_preview()
