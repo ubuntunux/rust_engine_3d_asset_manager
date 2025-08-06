@@ -192,11 +192,9 @@ class AssetImportManager:
         return self.load_asset(AssetTypes.MATERIAL, 'common/render_static_object')
 
     def override_material(self, material, material_instance, blend_filepath):
-        descriptor_name = self._asset_descriptor_manager.get_descriptor_name()
+        __logger__.info(f'override_material: {material_instance.get_asset_path()}')
         material.name = material_instance.get_asset_name()
-
-        asset_path = Path(descriptor_name, material.name).as_posix()
-        self.make_asset_library(asset=material, asset_type='MATERIAL_INSTANCE', asset_path=asset_path, filepath=blend_filepath)
+        self.make_asset_library(asset=material, asset_type=AssetTypes.MATERIAL_INSTANCE, asset_path=material_instance.get_asset_path(), filepath=blend_filepath)
 
         nodes = dict([(node.label, node) for node in material.node_tree.nodes if node.label])
         textures = material_instance.get_data(AssetTypes.TEXTURE)
@@ -230,7 +228,7 @@ class AssetImportManager:
             ext = texture.get_filepath().suffix
             dst_texture_filepath = Path(textures_path, texture.get_asset_path()).with_suffix(ext)
             if utilities.get_mtime(dst_texture_filepath) < texture.get_mtime():
-                __logger__.info(f'copy {dst_texture_filepath} -> {texture.get_filepath()}')
+                __logger__.info(f'copy {texture.get_filepath()} -> {dst_texture_filepath}')
                 utilities.copy(texture.get_filepath(), dst_texture_filepath)
 
     def import_meshes(self):
@@ -247,7 +245,7 @@ class AssetImportManager:
                 continue
             
             # save
-            __logger__.debug(f'save mesh: {blend_filepath}')
+            __logger__.info(f'save mesh: {blend_filepath}')
             utilities.save_as(blend_filepath)
             
             # import fbx
@@ -301,7 +299,7 @@ class AssetImportManager:
                 continue
             
             # save
-            __logger__.debug(f'save model: {blend_filepath}')
+            __logger__.info(f'save model: {blend_filepath}')
             utilities.save_as(blend_filepath)
             
             # create a collection
@@ -342,12 +340,21 @@ class AssetImportManager:
                 # override material
                 for (i, material_slot) in enumerate(obj.material_slots):
                     material = self.load_asset(AssetTypes.MATERIAL, material_paths[i])
-                    material_instance = material_instances[i]
                     material_slot.link = 'DATA'
                     material_slot.material = material
+
+                    # object material
                     material_slot.link = 'OBJECT'
-                    material_slot.material = material.copy()
-                    self.override_material(material_slot.material, material_instance, blend_filepath)
+                    material_instance = material_instances[i]
+                    material_instance_metadata = self.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, material_instance.get_asset_path())
+                    if material_instance_metadata:
+                        if material_instance_metadata.get_filepath() == blend_filepath:
+                            material_slot.material = bpy.data.materials[material_instance.get_asset_name()]
+                        else:
+                            material_slot.material = self.load_asset(AssetTypes.MATERIAL_INSTANCE, material_instance.get_asset_path())
+                    else:
+                        material_slot.material = material.copy()
+                        self.override_material(material_slot.material, material_instance, blend_filepath)
             
             # save final
             collection.asset_generate_preview()
