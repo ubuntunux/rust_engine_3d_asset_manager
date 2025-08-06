@@ -11,6 +11,8 @@ from collections import OrderedDict
 from enum import Enum
 from mathutils import Vector
 
+__logger__ = None
+
 def get_bound(collection):    
     m = sys.float_info.min
     M = sys.float_info.max
@@ -39,10 +41,14 @@ class ResourceType(Enum):
 
 
 class AssetInfo:
+    asset_import_manager = None
+
     def __init__(self, asset):
+        catalog_simple_name = self.asset_import_manager.get_asset_catalog_name_by_id(asset.asset_data.catalog_id)
+        tokens = catalog_simple_name.split('/')
+
         self.asset_name = asset.name
-        tokens = asset.asset_data.catalog_simple_name.split('-')
-        self.catalog_simple_name = asset.asset_data.catalog_simple_name
+        self.catalog_simple_name = catalog_simple_name
         self.asset_library_path = '/'.join(tokens)
         self.asset_library_name = tokens[0]
         self.asset_type_name = tokens[1]
@@ -58,10 +64,13 @@ class AssetInfo:
 
 
 class AssetExportManager:
-    def __init__(self, __logger__, library_name):
-        global logger
-        logger = __logger__
+    def __init__(self, logger, library_name, asset_import_manager):
+        global __logger__
+        __logger__ = logger
 
+        AssetInfo.asset_import_manager = asset_import_manager
+
+        self.asset_import_manager = asset_import_manager
         self.library_name = library_name
         self.asset_library = bpy.context.preferences.filepaths.asset_libraries.get(library_name)
         self.external_path = os.path.normpath(self.asset_library.path)
@@ -96,18 +105,18 @@ class AssetExportManager:
         return center / 8
 
     def copy_file(self, title, src_filepath, dst_filepath):
-        logger.info(f'{title}: {dst_filepath}')
+        __logger__.info(f'{title}: {dst_filepath}')
         try:
             dst_dirpath = os.path.split(dst_filepath)[0]
             if not os.path.exists(dst_dirpath):
                 os.makedirs(dst_dirpath)
             shutil.copy(src_filepath, dst_filepath)
         except:
-            logger.error(traceback.format_exc())
+            __logger__.error(traceback.format_exc())
             raise
 
     def write_to_file(self, title, data, export_filepath):
-        logger.info(f'{title}: {export_filepath}')
+        __logger__.info(f'{title}: {export_filepath}')
         export_path = os.path.split(export_filepath)[0]
         if not os.path.exists(export_path):
             os.makedirs(export_path)
@@ -212,13 +221,13 @@ class AssetExportManager:
                 export_anim_single_armature=False,
                 export_reset_pose_bones=True
             )
-            logger.info(f'export_selected_meshes {asset_info.asset_namepath}: {export_filepath}')
+            __logger__.info(f'export_selected_meshes {asset_info.asset_namepath}: {export_filepath}')
         except:
-            logger.error(traceback.format_exc())
+            __logger__.error(traceback.format_exc())
             raise
 
     def export_models(self, asset, asset_info):
-        logger.info(f'export_models: {asset_info.asset_namepath}')
+        __logger__.info(f'export_models: {asset_info.asset_namepath}')
 
         if 0 < len(asset.children):
             mesh_collection = asset.children[0]
@@ -354,7 +363,7 @@ class AssetExportManager:
                     'rotation': self.convert_asset_rotation(child, rx=90.0)
                 })
             elif 'EMPTY' == child.type and 'COLLECTION' == child.instance_type:
-                logger.info(f'child: {child.name, child.instance_collection.asset_data is None}')
+                __logger__.info(f'child: {child.name, child.instance_collection.asset_data is None}')
                 child_asset_info = AssetInfo(child.instance_collection)
                 if 'models' == child_asset_info.asset_type_name:
                     static_objects[child.name] = OrderedDict({
@@ -365,13 +374,13 @@ class AssetExportManager:
                     })
                     # TODO - Skeletal Mesh
                 else:
-                    logger.error(f'not implemented asset type {(child.name, child_asset_info.asset_type_name)}')
+                    __logger__.error(f'not implemented asset type {(child.name, child_asset_info.asset_type_name)}')
             else:
-                logger.error(f'not implemented object type {(child.name, child.type)}')
+                __logger__.error(f'not implemented object type {(child.name, child.type)}')
         return scene_data
 
     def export_scenes(self, asset, asset_info):
-        logger.info(f'export_scenes: {asset_info.asset_namepath}')
+        __logger__.info(f'export_scenes: {asset_info.asset_namepath}')
         scene_data = self.get_scene_data(asset)
         export_filepath = asset_info.get_asset_filepath(self.resource_path, ".scene")
         self.write_to_file('export scene', scene_data, export_filepath)
@@ -388,7 +397,7 @@ class AssetExportManager:
                         property_value_asset_info = AssetInfo(property_value)
                         game_data[key] = property_value_asset_info.asset_namepath
                 else:
-                    logger.error(f'get_game_data_character not implemented type: {key, property_type}')
+                    __logger__.error(f'get_game_data_character not implemented type: {key, property_type}')
 
         for child_property_asset in property_asset.children:
              child_game_data = OrderedDict()
@@ -403,8 +412,8 @@ class AssetExportManager:
         return game_data
 
     def export_game_data(self, asset, asset_info):
-        logger.info(f'export_game_data: {asset_info.asset_namepath}')
-        logger.info(f'library_name: {self.library_name}, external_path: {self.external_path}, resource_path: {self.resource_path}')
+        __logger__.info(f'export_game_data: {asset_info.asset_namepath}')
+        __logger__.info(f'library_name: {self.library_name}, external_path: {self.external_path}, resource_path: {self.resource_path}')
         
         tokens = asset_info.asset_library_path.split('/')
         if 'game_data' == asset_info.asset_type_name and 2 < len(tokens):
@@ -433,13 +442,13 @@ class AssetExportManager:
             elif 'game_scenes':
                 game_data = self.get_game_data_scenes(asset, asset_info)
             else:
-                logger.error(f'not implemented game data: {asset_info.asset_fullpath}')
+                __logger__.error(f'not implemented game data: {asset_info.asset_fullpath}')
                 
             if game_data:
                 export_filepath = asset_info.get_asset_filepath(self.resource_path, game_data_ext)
                 self.write_to_file('export game_data', game_data, export_filepath)
                 return
-        logger.error(f'error export_game_data: {asset_info.asset_fullpath}')
+        __logger__.error(f'error export_game_data: {asset_info.asset_fullpath}')
 
     # export game asset
     def get_game_asset_data(self, asset_container, child_asset, asset_data_name):
@@ -487,13 +496,13 @@ class AssetExportManager:
                 for child_object in child_asset.objects:
                     game_data['_start_point'] = self.convert_asset_location(child_object)
             else:
-                logger.error(f'not implemented object type {child_asset.name}')
+                __logger__.error(f'not implemented object type {child_asset.name}')
         return game_data
 
     # export asset
     def export_asset(self, asset):
         asset_info = AssetInfo(asset)
-        logger.info(f'export_asset: {asset_info.asset_fullpath}')
+        __logger__.info(f'export_asset: {asset_info.asset_fullpath}')
 
         if 'animation_layers' == asset_info.asset_type_name:
             self.export_animation_layers(asset, asset_info)
@@ -506,13 +515,13 @@ class AssetExportManager:
         elif 'game_data' == asset_info.asset_type_name:
             self.export_game_data(asset, asset_info)
         else:
-            logger.error(f'error export_asset: {asset_info.asset_type_name}')
+            __logger__.error(f'error export_asset: {asset_info.asset_type_name}')
 
     def export_assets(self):
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
         bpy.ops.object.select_all(action='SELECT')
         selected_objects = bpy.context.selected_objects
-        logger.info(f">>> export_assets: {selected_objects}")
+        __logger__.info(f">>> export_assets: {selected_objects}")
         for asset in selected_objects:
             bpy.ops.object.select_all(action='DESELECT')
             asset.select_set(True)
@@ -520,8 +529,8 @@ class AssetExportManager:
             if 'EMPTY' == asset.type and 'COLLECTION' == asset.instance_type:
                 self.export_asset(asset.instance_collection)
             else:
-                logger.error(f'error export_selected_objects: {asset.type}')
-        logger.info(f'>>> End: export_assets')
+                __logger__.error(f'error export_selected_objects: {asset.type}')
+        __logger__.info(f'>>> End: export_assets')
 
     def load_blend_file(self, blend_file):
         if not os.path.exists(blend_file):
@@ -534,9 +543,9 @@ class AssetExportManager:
             data_to.actions = data_from.actions
             data_to.armatures = data_from.armatures
             data_to.objects = data_from.objects
-            logger.info(f'collections: {len(data_to.collections)}')
-            logger.info(f'meshes: {len(data_to.meshes)}')
-            logger.info(f'objects: {len(data_to.objects)}')
+            __logger__.info(f'collections: {len(data_to.collections)}')
+            __logger__.info(f'meshes: {len(data_to.meshes)}')
+            __logger__.info(f'objects: {len(data_to.objects)}')
             return data_to
     
     def export_library_asset(self, asset, asset_data):        
@@ -557,7 +566,7 @@ class AssetExportManager:
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
     def export_blend(self, blend_file):
-        logger.info(f"export_blend: {blend_file}")
+        __logger__.info(f"export_blend: {blend_file}")
         data = self.load_blend_file(blend_file)
         if data:
             for (i, collection) in enumerate(data.collections):
@@ -569,7 +578,7 @@ class AssetExportManager:
                 self.export_library_asset(empty, collection)
 
     def export_resources(self):
-        logger.info(f'>>> export_resource: {self.asset_library.path}')
+        __logger__.info(f'>>> export_resource: {self.asset_library.path}')
         for dirpath, dirnames, filenames in os.walk(self.asset_library.path):
             for filename in filenames:
                 if '.blend' == os.path.splitext(filename)[1].lower():

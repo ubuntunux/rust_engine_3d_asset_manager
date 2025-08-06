@@ -27,33 +27,41 @@ logger = utilities.create_logger(
 )
 config_filepath = Path(__file__).with_name('config.ini')
 
+def import_or_export_assets(is_import):
+    bpy.context.window.cursor_set('WAIT')
+    try:
+        # AssetDescriptorManager
+        asset_descriptor_path = bpy.context.scene.asset_descriptor_path
+        asset_descriptor_manager = asset_descriptor.AssetDescriptorManager(logger, asset_descriptor_path)
+        if not asset_descriptor_manager.is_valid_asset_descriptor():
+            asset_descriptor_filepath = asset_descriptor_manager.create_default_asset_descriptor_file()
+            utilities.open_text_file_in_blender_editor(asset_descriptor_filepath, use_fake_user=False)
+            logger.info(f'edit asset descriptor file: {asset_descriptor_filepath}')
+            return
+
+        # AssetImportManager
+        asset_library_name = bpy.context.scene.asset_library_name
+        asset_import_manager = import_game_data.AssetImportManager(logger, asset_library_name, asset_descriptor_manager)
+        if is_import:
+            asset_import_manager.import_assets()
+        else:
+            # AssetExportManager
+            asset_export_manager = export_game_data.AssetExportManager(logger, asset_library_name, asset_import_manager)
+            asset_export_manager.export_assets()
+    except:
+        logger.info(traceback.format_exc())
+        raise
+    logger.info('FINISHED')
+    utilities.open_text_file_in_blender_editor(logger._filepath, use_fake_user=False)
+
+
 class AssetImportPanel(bpy.types.Operator):
     bl_idname = "object.asset_import_panel"
     bl_label = "import assets"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        try:
-            # AssetDescriptorManager
-            asset_descriptor_path = bpy.context.scene.asset_descriptor_path
-            asset_descriptor_manager = asset_descriptor.AssetDescriptorManager(logger, asset_descriptor_path)
-            if not asset_descriptor_manager.is_valid_asset_descriptor():
-                asset_descriptor_filepath = asset_descriptor_manager.create_default_asset_descriptor_file()
-                utilities.open_text_file_in_blender_editor(asset_descriptor_filepath, use_fake_user=False)
-                return {'FINISHED'}
-
-            # AssetImportManager
-            asset_library_name = bpy.context.scene.asset_library_name
-            asset_import_manager = import_game_data.AssetImportManager(logger, asset_library_name, asset_descriptor_manager)
-            asset_import_manager.import_assets()
-        except:
-            logger.info(traceback.format_exc())
-            raise
-
-        logger.info('FINISHED')
-
-        # open log file
-        utilities.open_text_file_in_blender_editor(logger._filepath, use_fake_user=False)
+        import_or_export_assets(is_import=True)
         return {'FINISHED'}
 
 
@@ -63,21 +71,7 @@ class AssetExportPanel(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        bpy.context.window.cursor_set('WAIT')
-        try:
-            # AssetExportManager
-            asset_library_name = bpy.context.scene.asset_library_name
-            asset_export_manager = export_game_data.AssetExportManager(logger, asset_library_name)
-            asset_export_manager.export_assets()
-        except:
-            logger.info(traceback.format_exc())
-            raise
-
-        bpy.context.window.cursor_set('DEFAULT')
-        logger.info('FINISHED')
-
-        # open log file
-        utilities.open_text_file_in_blender_editor(logger._filepath)
+        import_or_export_assets(is_import=False)
         return {'FINISHED'}
 
 

@@ -25,9 +25,13 @@ class AssetImportManager:
         self._asset_descriptor_manager = asset_descriptor_manager
         self._asset_metadata_filepath = Path(asset_library.path, 'asset_metadata.json')
 
+        # initialize
+        self.initialize()
+
     def initialize(self):
         self.load_asset_catalogs()
         self.load_asset_metadata()
+        self._asset_descriptor_manager.process()
 
     def get_asset_type_and_name_from_asset_path(self, target_asset_path):
         for asset_type_name, asset_catalog_name in self._asset_catalog_name_type_map.items():
@@ -362,12 +366,6 @@ class AssetImportManager:
         
     def import_assets(self):
         __logger__.info(f'>>> Begin: import_assets')
-
-        # initialize
-        self.initialize()
-
-        # load asset descriptor
-        self._asset_descriptor_manager.process()
         
         # process import        
         self.import_textures()
