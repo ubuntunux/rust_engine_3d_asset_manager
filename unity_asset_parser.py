@@ -29,18 +29,16 @@ class UnityAssetParser(AssetParser):
     def extract_guid(filepath: Path):
         if filepath.exists():
             meta_filepath = filepath.with_suffix(f'{filepath.suffix}.meta')
-            __logger__.info(f'>>> YAML.load_yaml: {meta_filepath}')
             metadata = YAML.load_yaml(meta_filepath)
             return metadata.get_child('guid').get_value()
         return ''
 
     @staticmethod
     def extract_color(value):
-        return dict([(key, eval(value)) for key, value in value.items()])
+        return [eval(value) for key, value in value.items()]
 
     def process_asset_data(self, asset_descriptor_data, asset_metadata):
-        __logger__.info(f'>>> process_asset_data: {asset_metadata}')
-        __logger__.info(f'        filepath: {asset_metadata.get_filepath()}')
+        __logger__.debug(f'>>> process_asset_data: {asset_metadata.get_asset_path()}')
         match(asset_metadata.get_asset_type()):
             case AssetTypes.MATERIAL:
                 pass
@@ -68,7 +66,6 @@ class UnityAssetParser(AssetParser):
 
     @staticmethod
     def process_material_and_parameters(asset_descriptor_data, yaml_data):
-        __logger__.info(f'>>> process_material_and_parameters: yaml_data {yaml_data.dump()}')
         parameters = {}
         material_guid = yaml_data.get_child('Material').get_child('m_Shader').get('guid')
         material_create_info = asset_descriptor_data[AssetTypes.MATERIAL]['material_create_infos'][material_guid]
@@ -90,12 +87,12 @@ class UnityAssetParser(AssetParser):
             if m_Color.get_name() in material_create_info['m_Colors']:
                 parameters[AssetTypes.COLOR][m_Color.get_name()] = UnityAssetParser.extract_color(m_Color.get_value())
 
-        parameters[AssetTypes.FLOAT] = {}
+        parameters[AssetTypes.VALUE] = {}
         m_Floats = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_Floats').get_children()
         for m_FloatGroup in m_Floats:
             m_Float = m_FloatGroup.get_node(0)
             if m_Float.get_name() in material_create_info['m_Floats']:
-                parameters[AssetTypes.FLOAT][m_Float.get_name()] = float(m_Float.get_value())
+                parameters[AssetTypes.VALUE][m_Float.get_name()] = float(m_Float.get_value())
 
         return parameters
 
@@ -171,7 +168,7 @@ class UnityAssetParser(AssetParser):
                             )
                             asset_metadata_list.append(asset_metadata)
                             __asset_descriptor_manager__.register_asset_metadata(asset_metadata)
-                            __logger__.info(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
+                            __logger__.debug(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
             # MATERIAL: material_create_infos
             if AssetTypes.MATERIAL == asset_type:
                 for (material_guid, material_create_info) in descriptor_data.get('material_create_infos', {}).items():
@@ -188,7 +185,7 @@ class UnityAssetParser(AssetParser):
                         )
                         asset_metadata_list.append(asset_metadata)
                         __asset_descriptor_manager__.register_asset_metadata(asset_metadata)
-                        __logger__.info(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
+                        __logger__.debug(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
 
         # process_asset_data
         for asset_metadata_list in new_asset_metadata_list_by_types.values():

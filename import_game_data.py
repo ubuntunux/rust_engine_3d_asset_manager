@@ -191,24 +191,35 @@ class AssetImportManager:
     def load_default_material(self):
         return self.load_asset(AssetTypes.MATERIAL, 'common/render_static_object')
 
-    def override_material(self, material, material_name, blend_filepath):
+    def override_material(self, material, material_instance, blend_filepath):
         descriptor_name = self._asset_descriptor_manager.get_descriptor_name()
-        material.name = material_name
+        material.name = material_instance.get_asset_name()
 
         asset_path = Path(descriptor_name, material.name).as_posix()
         self.make_asset_library(asset=material, asset_type='MATERIAL_INSTANCE', asset_path=asset_path, filepath=blend_filepath)
-        
-        for node in material.node_tree.nodes:
-            if node.label == '_MainTex':
-                texture_filepath = Path(self._asset_library.path, 'textures/PolygonNatureBiomes/Terrain/Rock_Texture_01.png').as_posix()
-                image_data = bpy.data.images.load(filepath=texture_filepath, check_existing=True)
-                image_data.filepath = bpy.path.relpath(texture_filepath)
-                node.image = image_data
-                __logger__.debug(node.image.filepath)
-            elif node.label == 'textureMaterial':
-                pass
-            elif node.label == 'textureNormal':
-                pass
+
+        nodes = dict([(node.label, node) for node in material.node_tree.nodes if node.label])
+        textures = material_instance.get_data(AssetTypes.TEXTURE)
+        colors = material_instance.get_data(AssetTypes.COLOR)
+        values = material_instance.get_data(AssetTypes.VALUE)
+        for override_values in [textures, colors, values]:
+            for label, value in override_values.items():
+                node = nodes.get(label)
+                if node:
+                    match(node.type):
+                        case 'TEX_IMAGE':
+                            texture = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.TEXTURE, asset_path=value)
+                            if texture:
+                                image_filepath = texture.get_filepath().as_posix()
+                                image_data = bpy.data.images.load(filepath=image_filepath, check_existing=True)
+                                image_data.filepath = bpy.path.relpath(image_filepath)
+                                node.image = image_data
+                        case 'RGB':
+                            node.outputs['Color'].default_value = value
+                        case 'VALUE':
+                            node.outputs['Value'].default_value = value
+                        case _:
+                            raise ValueError(f'Unknown node type: {node.type}, label: {node.label}')
     
     # process import
     def import_textures(self):
@@ -236,7 +247,7 @@ class AssetImportManager:
                 continue
             
             # save
-            __logger__.info(f'save mesh: {blend_filepath}')
+            __logger__.debug(f'save mesh: {blend_filepath}')
             utilities.save_as(blend_filepath)
             
             # import fbx
@@ -280,6 +291,7 @@ class AssetImportManager:
         model_path = Path(self._asset_library.path, 'models')
         models = self._asset_descriptor_manager.get_asset_metadata_list(AssetTypes.MODEL).values()
 
+        __logger__.info(f'>>> import_models: {len(models)}')
         for model in models:
             utilities.clear_scene()
 
@@ -289,7 +301,7 @@ class AssetImportManager:
                 continue
             
             # save
-            __logger__.info(f'save model: {blend_filepath}')
+            __logger__.debug(f'save model: {blend_filepath}')
             utilities.save_as(blend_filepath)
             
             # create a collection
@@ -300,9 +312,11 @@ class AssetImportManager:
             # link mesh and override
             mesh_asset_path = model.get_data(AssetTypes.MESH)
             mesh_asset_collection = self.load_asset(asset_type=AssetTypes.MESH, asset_path=mesh_asset_path)
+            # override collection
             override_collection = mesh_asset_collection.override_hierarchy_create(bpy.context.scene, bpy.context.view_layer, do_fully_editable=True)
             for obj in override_collection.objects:
                 if obj.data:
+                    # override data - mesh
                     obj.data.override_create(remap_local_usages=True)
             bpy.context.scene.collection.children.unlink(override_collection)
             collection.children.link(override_collection)
@@ -325,15 +339,15 @@ class AssetImportManager:
                 # move to a collection
                 utilities.move_to_collection(collection, obj)
 
-                # set material
+                # override material
                 for (i, material_slot) in enumerate(obj.material_slots):
                     material = self.load_asset(AssetTypes.MATERIAL, material_paths[i])
-                    material_instance_path = material_instances[i].get_asset_path()
+                    material_instance = material_instances[i]
                     material_slot.link = 'DATA'
                     material_slot.material = material
                     material_slot.link = 'OBJECT'
                     material_slot.material = material.copy()
-                    self.override_material(material_slot.material, material_instance_path, blend_filepath)
+                    self.override_material(material_slot.material, material_instance, blend_filepath)
             
             # save final
             collection.asset_generate_preview()

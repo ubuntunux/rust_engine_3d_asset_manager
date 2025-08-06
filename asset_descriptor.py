@@ -10,7 +10,7 @@ global __asset_parser__
 class AssetTypes:
     ANIMATION_LAYER = 'ANIMATION_LAYER'
     COLOR = 'COLOR'
-    FLOAT = 'FLOAT'
+    VALUE = 'VALUE'
     GAME_CHARACTER = 'GAME_CHARACTER'
     GAME_DATA = 'GAME_DATA'
     GAME_SCENE = 'GAME_SCENE'
