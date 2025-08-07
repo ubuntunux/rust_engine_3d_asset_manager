@@ -208,7 +208,6 @@ class AssetExportManager:
                             # gather texture parameter
                             image_filepath = node.image.filepath.replace('\\', '/')
                             tokens = image_filepath.split('/')
-                            __logger__.info(f'image_filepath: {image_filepath}, tokens: {tokens}')
                             textures_index = tokens.index('textures')
                             image_relative_filepath = os.path.join(*tokens[textures_index:])
                             image_filepath = os.path.abspath(os.path.join(self.resource_path, image_relative_filepath))
@@ -671,7 +670,7 @@ class AssetExportManager:
         #             os.remove(asset_metadata.get_filepath())
 
         # clear scene
-        utilities.clear_scene()
+        utilities.clear_scene(read_homefile=False)
 
     def run_export_resources(self):
         if bpy.context.selected_objects:
