@@ -26,7 +26,7 @@ class AssetTypes:
 
     @classmethod
     def get_types(cls):
-        return [key for key in AssetTypes.__dict__.keys() if key.isupper()]
+        return [key for key in cls.__dict__.keys() if key.isupper()]
 
 
 ASSET_DESCRIPTOR_TEMPLATE = '''

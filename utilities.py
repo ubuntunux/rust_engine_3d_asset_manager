@@ -57,8 +57,9 @@ def clear_assets(bpy_data_type):
         asset.use_fake_user = False
         bpy_data_type.remove(asset)
 
-def clear_scene():
-    bpy.ops.wm.read_homefile(app_template="")
+def clear_scene(read_homefile=True):
+    if read_homefile:
+        bpy.ops.wm.read_homefile(app_template="")
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(confirm=False)
 

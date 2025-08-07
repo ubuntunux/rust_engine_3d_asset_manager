@@ -47,7 +47,7 @@ def import_or_export_assets(is_import):
         else:
             # AssetExportManager
             asset_export_manager = export_game_data.AssetExportManager(logger, asset_library_name, asset_import_manager)
-            asset_export_manager.export_assets()
+            asset_export_manager.run_export_resources()
     except:
         logger.info(traceback.format_exc())
         raise

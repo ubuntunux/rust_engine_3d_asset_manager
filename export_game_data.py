@@ -9,7 +9,10 @@ import traceback
 
 from collections import OrderedDict
 from enum import Enum
+from pathlib import Path
 from mathutils import Vector
+from .asset_descriptor import AssetMetadata
+from . import utilities
 
 __logger__ = None
 
@@ -25,6 +28,41 @@ def get_bound(collection):
             pos_min = Vector([min(z) for z in zip(pos, pos_min)])
             pos_max = Vector([max(z) for z in zip(pos, pos_max)])
     return (pos_min, pos_max)
+
+
+class AssetCatalogName:
+    ANIMATION_LAYER = 'animation_layers'
+    GAME_CHARACTER = 'game_data/characters'
+    GAME_SCENE = 'game_data/game_scenes'
+    GAME_ITEM = 'game_data/items'
+    GAME_PROP = 'game_data/props'
+    GAME_WEAPON = 'game_data/weapons'
+    MATERIAL = 'materials'
+    MATERIAL_INSTANCE = 'material_instances'
+    MESH = 'meshes'
+    MODEL = 'models'
+    SCENE = 'scenes'
+
+    @classmethod
+    def get_catalog_names(cls):
+        return dict([(key, cls.__dict__[key]) for key in cls.__dict__.keys() if key.isupper()])
+
+class AssetExts:
+    ANIMATION_LAYER = ['.layer']
+    GAME_CHARACTER = ['.data']
+    GAME_SCENE = ['.data']
+    GAME_ITEM = ['.data']
+    GAME_PROP = ['.data']
+    GAME_WEAPON = ['.data']
+    MATERIAL = ['.mat']
+    MATERIAL_INSTANCE = ['.matinst']
+    MESH = ['.gltf', '.obj']
+    MODEL = ['.model']
+    SCENE = ['.scene']
+
+    @classmethod
+    def get_asset_exts(cls):
+        return dict([(key, cls.__dict__[key]) for key in cls.__dict__.keys() if key.isupper()])
 
 
 class ResourceTypeInfo:
@@ -170,6 +208,7 @@ class AssetExportManager:
                             # gather texture parameter
                             image_filepath = node.image.filepath.replace('\\', '/')
                             tokens = image_filepath.split('/')
+                            __logger__.info(f'image_filepath: {image_filepath}, tokens: {tokens}')
                             textures_index = tokens.index('textures')
                             image_relative_filepath = os.path.join(*tokens[textures_index:])
                             image_filepath = os.path.abspath(os.path.join(self.resource_path, image_relative_filepath))
@@ -517,9 +556,9 @@ class AssetExportManager:
         else:
             __logger__.error(f'error export_asset: {asset_info.asset_type_name}')
 
-    def export_assets(self):
+    def export_selected_assets(self):
         bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
-        bpy.ops.object.select_all(action='SELECT')
+        #bpy.ops.object.select_all(action='SELECT')
         selected_objects = bpy.context.selected_objects
         __logger__.info(f">>> export_assets: {selected_objects}")
         for asset in selected_objects:
@@ -533,9 +572,6 @@ class AssetExportManager:
         __logger__.info(f'>>> End: export_assets')
 
     def load_blend_file(self, blend_file):
-        if not os.path.exists(blend_file):
-            return None
-        
         with bpy.data.libraries.load(blend_file, assets_only=True, link=True) as (data_from, data_to):
             data_to.materials = data_from.materials
             data_to.meshes = data_from.meshes
@@ -543,52 +579,107 @@ class AssetExportManager:
             data_to.actions = data_from.actions
             data_to.armatures = data_from.armatures
             data_to.objects = data_from.objects
-            __logger__.info(f'collections: {len(data_to.collections)}')
-            __logger__.info(f'meshes: {len(data_to.meshes)}')
-            __logger__.info(f'objects: {len(data_to.objects)}')
             return data_to
-    
-    def export_library_asset(self, asset, asset_data):        
+
+    def export_library_asset(self, asset, asset_data):
         bpy.context.scene.collection.objects.link(asset)
-                
-        # select collection
         bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = asset
         asset.select_set(True)
+        asset.location = [0, 0, 0]
 
         # export asset data
         self.export_asset(asset_data)
 
-        # remove a collection
-        bpy.context.scene.collection.objects.unlink(asset)
-        bpy.data.objects.remove(asset)
-
-        # clean-up recursive unused data-blocks
-        bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
-
     def export_blend(self, blend_file):
         __logger__.info(f"export_blend: {blend_file}")
-        data = self.load_blend_file(blend_file)
-        if data:
-            for (i, collection) in enumerate(data.collections):
-                # create a collection
-                empty = bpy.data.objects.new(collection.name, None)
-                empty.instance_type = 'COLLECTION'
-                empty.instance_collection = collection
-                # export
-                self.export_library_asset(empty, collection)
+
+        if os.path.exists(blend_file):
+            utilities.clear_scene(read_homefile=False)
+            data = self.load_blend_file(blend_file)
+            if data:
+                for (i, collection) in enumerate(data.collections):
+                    # create a collection
+                    empty = bpy.data.objects.new(collection.name, None)
+                    empty.instance_type = 'COLLECTION'
+                    empty.instance_collection = collection
+                    # export
+                    self.export_library_asset(empty, collection)
 
     def export_resources(self):
         __logger__.info(f'>>> export_resource: {self.asset_library.path}')
-        for dirpath, dirnames, filenames in os.walk(self.asset_library.path):
-            for filename in filenames:
-                if '.blend' == os.path.splitext(filename)[1].lower():
-                    self.export_blend(os.path.join(dirpath, filename))
 
-def run_export_resources():
-    exporter = AssetExportManager('StoneAge')
-    exporter.export_assets()
-    #exporter.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/models/environments/cactus.blend')
-    #exporter.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/meshes/environments/cliff_grass.blend')
-    #exporter.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/meshes/characters/jack/jack.blend')
-    #exporter.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/models/characters/jack.blend')
-    #exporter.export_resources()
+        # build asset metadata of exporter
+        exporter_asset_metadata = {}
+        catalog_names = AssetCatalogName.get_catalog_names()
+        all_asset_exts = AssetExts.get_asset_exts()
+        for asset_type, catalog_name in catalog_names.items():
+            asset_dir = Path(self.resource_path, catalog_name)
+            for dirpath, dirnames, filenames in os.walk(asset_dir):
+                for filename in filenames:
+                    filepath = Path(dirpath, filename)
+                    ext = filepath.suffix.lower()
+                    asset_path = filepath.relative_to(asset_dir).with_suffix('').as_posix()
+                    if ext in all_asset_exts[asset_type]:
+                        asset_metadata = AssetMetadata(
+                            asset_type=asset_type,
+                            asset_path=asset_path,
+                            filepath=filepath,
+                            mtime=utilities.get_mtime(filepath)
+                        )
+                        if asset_type not in exporter_asset_metadata:
+                            exporter_asset_metadata[asset_type] = {}
+                        exporter_asset_metadata[asset_type][asset_path] = asset_metadata
+
+        # load asset metadata of importer
+        asset_metadata_in_files = {}
+        importer_asset_metadata = self.asset_import_manager.get_asset_metadata_list()
+        for asset_type, asset_metadata_by_type in importer_asset_metadata.items():
+            for asset_path, asset_metadata in asset_metadata_by_type.items():
+                filepath = asset_metadata.get_filepath()
+                if not filepath.exists():
+                    continue
+
+                if filepath not in asset_metadata_in_files:
+                    asset_metadata_in_files[filepath] = []
+                asset_metadata_in_files[filepath].append(asset_metadata)
+
+        # export assets
+        for filepath, asset_metadata_list in asset_metadata_in_files.items():
+            source_file_mtime = utilities.get_mtime(filepath)
+            for source_asset_metadata in asset_metadata_list:
+                asset_type = source_asset_metadata.get_asset_type()
+                asset_path = source_asset_metadata.get_asset_path()
+                export_assets = True
+                if asset_type in exporter_asset_metadata and asset_path in exporter_asset_metadata[asset_type]:
+                    target_asset_metadata = exporter_asset_metadata[asset_type][asset_path]
+                    if target_asset_metadata.get_filepath().exists() and source_file_mtime <= target_asset_metadata.get_mtime():
+                        export_assets = False
+
+                if export_assets and filepath.suffix.lower() == '.blend':
+                    self.export_blend(filepath.as_posix())
+                    break
+                else:
+                    __logger__.debug(f'>>> skip export filepath: {filepath}, assets: {[metadata.get_asset_path() for metadata in asset_metadata_list]}')
+                    pass
+
+        # remove asset_metadata
+        # for asset_type, asset_metadata_list in exporter_asset_metadata.items():
+        #     for asset_path, asset_metadata in asset_metadata_list.items():
+        #         if asset_type not in importer_asset_metadata or asset_path not in importer_asset_metadata[asset_type]:
+        #             __logger__.info(f'remove asset: {asset_metadata.get_filepath()}')
+        #             os.remove(asset_metadata.get_filepath())
+
+        # clear scene
+        utilities.clear_scene()
+
+    def run_export_resources(self):
+        if bpy.context.selected_objects:
+            self.export_selected_assets()
+        else:
+            self.export_resources()
+
+        #self.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/models/environments/cactus.blend')
+        #self.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/meshes/environments/cliff_grass.blend')
+        #self.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/meshes/characters/jack/jack.blend')
+        #self.export_blend('/home/ubuntunux/WorkSpace/StoneAge/resources/externals/models/characters/jack.blend')

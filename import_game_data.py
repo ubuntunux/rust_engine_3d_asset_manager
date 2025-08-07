@@ -100,13 +100,16 @@ class AssetImportManager:
             with open(self._asset_metadata_filepath, 'r', encoding='utf-8') as f:
                 loaded_data = json.load(f)
                 for (filepath, asset_metadata_list) in loaded_data.items():
-                    for asset_path, asset_metadata_dict in asset_metadata_list.items():
+                    if not os.path.exists(filepath):
+                        continue
+
+                    for asset_metadata_dict in asset_metadata_list:
                         asset_metadata = AssetMetadata(**asset_metadata_dict)
                         filepath = asset_metadata.get_filepath()
                         if filepath.exists() and filepath.stat().st_mtime <= asset_metadata.get_mtime():
                             if filepath not in asset_metadata_in_files:
-                                asset_metadata_in_files[filepath] = {}
-                            asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
+                                asset_metadata_in_files[filepath] = []
+                            asset_metadata_in_files[filepath].append(asset_metadata)
 
         # update asset metadata
         for filepath in self._asset_metadata_filepath.parent.glob('**/*.blend'):
@@ -136,13 +139,13 @@ class AssetImportManager:
                                 mtime=utilities.get_mtime(filepath)
                             )
                             if filepath not in asset_metadata_in_files:
-                                asset_metadata_in_files[filepath] = {}
-                            asset_metadata_in_files[filepath][asset_metadata.get_asset_path()] = asset_metadata
+                                asset_metadata_in_files[filepath] = []
+                            asset_metadata_in_files[filepath].append(asset_metadata)
 
         # convert asset metadata
         self._asset_metadata.clear()
         for (filepath, asset_metadata_list) in asset_metadata_in_files.items():
-            for asset_path, asset_metadata in asset_metadata_list.items():
+            for asset_metadata in asset_metadata_list:
                 self.register_asset_metadata(asset_metadata.get_asset_type(), asset_metadata.get_asset_path(), filepath)
 
         # save to file
@@ -156,13 +159,16 @@ class AssetImportManager:
                 for asset_path, asset_metadata in asset_metadata_list.items():
                     filepath = asset_metadata.get_filepath().as_posix()
                     if filepath not in save_data:
-                        save_data[filepath] = {}
-                    save_data[filepath][asset_path] = asset_metadata.dump()
+                        save_data[filepath] = []
+                    save_data[filepath].append(asset_metadata.dump())
             json.dump(save_data, f, indent=4)
 
     def get_asset_metadata(self, asset_type, asset_path):
         type_asset_metadata = self._asset_metadata.get(asset_type)
         return type_asset_metadata.get(asset_path) if type_asset_metadata else None
+
+    def get_asset_metadata_list(self):
+        return self._asset_metadata
 
     def load_asset(self, asset_type, asset_path):
         asset_metadata = self.get_asset_metadata(asset_type, asset_path)
@@ -210,7 +216,7 @@ class AssetImportManager:
                 if node:
                     match(node.type):
                         case 'TEX_IMAGE':
-                            texture = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.TEXTURE, asset_path=value)
+                            texture = self.get_asset_metadata(AssetTypes.TEXTURE, asset_path=value)
                             if texture:
                                 image_filepath = texture.get_filepath().as_posix()
                                 image_data = bpy.data.images.load(filepath=image_filepath, check_existing=True)
@@ -234,6 +240,7 @@ class AssetImportManager:
             if utilities.get_mtime(dst_texture_filepath) < texture.get_mtime():
                 __logger__.info(f'copy {texture.get_filepath()} -> {dst_texture_filepath}')
                 utilities.copy(texture.get_filepath(), dst_texture_filepath)
+                self.register_asset_metadata(texture.get_asset_type(), texture.get_asset_path(), dst_texture_filepath)
 
     def import_meshes(self):
         mesh_path = Path(self._asset_library.path, 'meshes')
