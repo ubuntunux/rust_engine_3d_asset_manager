@@ -1,7 +1,8 @@
+import math
 import os
-from pathlib import Path
 import uuid
 import json
+from pathlib import Path
 
 import bpy
 
@@ -370,6 +371,45 @@ class AssetImportManager:
             # save final
             collection.asset_generate_preview()
             utilities.save_as(blend_filepath)
+
+    def import_scenes(self):
+        scene_path = Path(self._asset_library.path, 'scenes')
+        scenes = self._asset_descriptor_manager.get_asset_metadata_list(AssetTypes.SCENE).values()
+
+        __logger__.info(f'>>> import_scenes: {len(scenes)}')
+        for scene in scenes:
+            utilities.clear_scene()
+
+            asset_path = scene.get_asset_path()
+            blend_filepath = Path(scene_path, asset_path).with_suffix('.blend')
+            if scene.get_mtime() <= utilities.get_mtime(blend_filepath):
+                continue
+
+            # save
+            __logger__.info(f'save scene: {blend_filepath}')
+            utilities.save_as(blend_filepath)
+
+            # create a collection
+            asset_name = Path(asset_path).name
+            collection = utilities.create_collection(asset_name)
+            self.make_asset_library(asset=collection, asset_type=AssetTypes.SCENE, asset_path=asset_path, filepath=blend_filepath)
+
+            # link model - MODEL_INFO_TEMPLATE
+            model_infos = scene.get_data(AssetTypes.MODEL)
+            for model_info in model_infos:
+                model_asset_collection = self.load_asset(asset_type=AssetTypes.MODEL, asset_path=model_info['asset_path'])
+                if model_asset_collection:
+                    asset = bpy.data.objects.new(model_asset_collection.name, None)
+                    asset.instance_type = 'COLLECTION'
+                    asset.instance_collection = model_asset_collection
+                    asset.location = model_info.get('position')
+                    asset.rotation_euler = [r / 180.0 * math.pi for r in model_info.get('rotation')]
+                    asset.scale = model_info.get('scale')
+                    collection.objects.link(asset)
+
+            # save final
+            collection.asset_generate_preview()
+            utilities.save_as(blend_filepath)
         
     def import_assets(self):
         __logger__.info(f'>>> Begin: import_assets')
@@ -378,6 +418,7 @@ class AssetImportManager:
         self.import_textures()
         self.import_meshes()
         self.import_models()
+        self.import_scenes()
 
         # close
         utilities.clear_scene()

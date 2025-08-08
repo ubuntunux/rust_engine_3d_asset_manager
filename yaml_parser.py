@@ -131,7 +131,7 @@ class YAML:
                     elif list_values:
                         value = []
                         for list_value in list_values.groups()[0].split(','):
-                            value.append = list_value.strip()
+                            value.append(list_value.strip())
 
                     yaml_node = YAML(name=name, value=value, prefix=prefix, depth=num_depth)
                     if (self._depth + 1) == num_depth:

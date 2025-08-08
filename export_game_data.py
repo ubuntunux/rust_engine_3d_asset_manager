@@ -11,7 +11,7 @@ from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
 from mathutils import Vector
-from .asset_descriptor import AssetMetadata
+from .asset_descriptor import AssetTypeCatalogNames, AssetExts, AssetMetadata
 from . import utilities
 
 __logger__ = None
@@ -28,41 +28,6 @@ def get_bound(collection):
             pos_min = Vector([min(z) for z in zip(pos, pos_min)])
             pos_max = Vector([max(z) for z in zip(pos, pos_max)])
     return (pos_min, pos_max)
-
-
-class AssetCatalogName:
-    ANIMATION_LAYER = 'animation_layers'
-    GAME_CHARACTER = 'game_data/characters'
-    GAME_SCENE = 'game_data/game_scenes'
-    GAME_ITEM = 'game_data/items'
-    GAME_PROP = 'game_data/props'
-    GAME_WEAPON = 'game_data/weapons'
-    MATERIAL = 'materials'
-    MATERIAL_INSTANCE = 'material_instances'
-    MESH = 'meshes'
-    MODEL = 'models'
-    SCENE = 'scenes'
-
-    @classmethod
-    def get_catalog_names(cls):
-        return dict([(key, cls.__dict__[key]) for key in cls.__dict__.keys() if key.isupper()])
-
-class AssetExts:
-    ANIMATION_LAYER = ['.layer']
-    GAME_CHARACTER = ['.data']
-    GAME_SCENE = ['.data']
-    GAME_ITEM = ['.data']
-    GAME_PROP = ['.data']
-    GAME_WEAPON = ['.data']
-    MATERIAL = ['.mat']
-    MATERIAL_INSTANCE = ['.matinst']
-    MESH = ['.gltf', '.obj']
-    MODEL = ['.model']
-    SCENE = ['.scene']
-
-    @classmethod
-    def get_asset_exts(cls):
-        return dict([(key, cls.__dict__[key]) for key in cls.__dict__.keys() if key.isupper()])
 
 
 class ResourceTypeInfo:
@@ -610,7 +575,7 @@ class AssetExportManager:
 
         # build asset metadata of exporter
         exporter_asset_metadata = {}
-        catalog_names = AssetCatalogName.get_catalog_names()
+        catalog_names = AssetTypeCatalogNames.get_catalog_names()
         all_asset_exts = AssetExts.get_asset_exts()
         for asset_type, catalog_name in catalog_names.items():
             asset_dir = Path(self.resource_path, catalog_name)

@@ -7,27 +7,6 @@ global __logger__
 global __asset_descriptor_manager__
 global __asset_parser__
 
-class AssetTypes:
-    ANIMATION_LAYER = 'ANIMATION_LAYER'
-    COLOR = 'COLOR'
-    VALUE = 'VALUE'
-    GAME_CHARACTER = 'GAME_CHARACTER'
-    GAME_DATA = 'GAME_DATA'
-    GAME_SCENE = 'GAME_SCENE'
-    GAME_ITEM = 'GAME_ITEM'
-    GAME_PROP = 'GAME_PROP'
-    GAME_WEAPON = 'GAME_WEAPON'
-    MATERIAL = 'MATERIAL'
-    MATERIAL_INSTANCE = 'MATERIAL_INSTANCE'
-    MESH = 'MESH'
-    MODEL = 'MODEL'
-    SCENE = 'SCENE'
-    TEXTURE = 'TEXTURE'
-
-    @classmethod
-    def get_types(cls):
-        return [key for key in cls.__dict__.keys() if key.isupper()]
-
 
 ASSET_DESCRIPTOR_TEMPLATE = '''
 {
@@ -100,6 +79,33 @@ ASSET_DESCRIPTOR_TEMPLATE = '''
 }
 '''
 
+MODEL_INFO_TEMPLATE = {
+    'asset_path': '',
+    'position': [0, 0, 0],
+    'rotation': [0, 0, 0],
+    'scale': [1, 1, 1],
+}
+
+class AssetTypes:
+    ANIMATION_LAYER = 'ANIMATION_LAYER'
+    COLOR = 'COLOR'
+    VALUE = 'VALUE'
+    GAME_CHARACTER = 'GAME_CHARACTER'
+    GAME_DATA = 'GAME_DATA'
+    GAME_SCENE = 'GAME_SCENE'
+    GAME_ITEM = 'GAME_ITEM'
+    GAME_PROP = 'GAME_PROP'
+    GAME_WEAPON = 'GAME_WEAPON'
+    MATERIAL = 'MATERIAL'
+    MATERIAL_INSTANCE = 'MATERIAL_INSTANCE'
+    MESH = 'MESH'
+    MODEL = 'MODEL'
+    SCENE = 'SCENE'
+    TEXTURE = 'TEXTURE'
+
+    @classmethod
+    def get_types(cls):
+        return [key for key in cls.__dict__.keys() if key.isupper()]
 
 class AssetTypeCatalogNames:
     asset_type_catalog_names = {
@@ -110,8 +116,8 @@ class AssetTypeCatalogNames:
         AssetTypes.GAME_ITEM: 'game_data/items',
         AssetTypes.GAME_PROP: 'game_data/props',
         AssetTypes.GAME_WEAPON: 'game_data/weapons',
-        AssetTypes.MATERIAL_INSTANCE: 'material_instances',
         AssetTypes.MATERIAL: 'materials',
+        AssetTypes.MATERIAL_INSTANCE: 'material_instances',
         AssetTypes.MESH: 'meshes',
         AssetTypes.MODEL: 'models',
         AssetTypes.SCENE: 'scenes',
@@ -125,6 +131,32 @@ class AssetTypeCatalogNames:
     @classmethod
     def get_asset_type_catalog_name(cls, asset_type):
         return cls.asset_type_catalog_names.get(asset_type)
+
+    @classmethod
+    def get_catalog_names(cls):
+        return cls.asset_type_catalog_names
+
+
+class AssetExts:
+    asset_type_exts = {
+        AssetTypes.ANIMATION_LAYER: ['.layer'],
+        AssetTypes.GAME_CHARACTER: ['.data'],
+        AssetTypes.GAME_DATA: ['.data'],
+        AssetTypes.GAME_SCENE: ['.data'],
+        AssetTypes.GAME_ITEM: ['.data'],
+        AssetTypes.GAME_PROP: ['.data'],
+        AssetTypes.GAME_WEAPON: ['.data'],
+        AssetTypes.MATERIAL: ['.mat'],
+        AssetTypes.MATERIAL_INSTANCE: ['.matinst'],
+        AssetTypes.MESH: ['.gltf', '.obj'],
+        AssetTypes.MODEL: ['.model'],
+        AssetTypes.SCENE: ['.scene'],
+        AssetTypes.TEXTURE: ['.png', '.tga', '.jpeg', '.jpg']
+    }
+
+    @classmethod
+    def get_asset_exts(cls):
+        return cls.asset_type_exts
 
 
 class AssetMetadata:

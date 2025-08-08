@@ -1,9 +1,10 @@
+import copy
 import re
 from pathlib import Path
 
 from . import utilities
-from .asset_descriptor import AssetMetadata, AssetTypes, AssetParser
 from . import yaml_parser
+from .asset_descriptor import MODEL_INFO_TEMPLATE, AssetMetadata, AssetTypes, AssetParser
 from .yaml_parser import YAML
 
 
@@ -56,7 +57,9 @@ class UnityAssetParser(AssetParser):
                 asset_metadata.set_data(AssetTypes.MATERIAL_INSTANCE, material_instance_asset_paths)
                 asset_metadata.set_data(AssetTypes.MESH, mesh_asset_path)
             case AssetTypes.SCENE:
-                pass
+                yaml_data = YAML.load_yaml(asset_metadata.get_filepath())
+                model_infos = self.process_model_infos(yaml_data)
+                asset_metadata.set_data(AssetTypes.MODEL, model_infos)
             case AssetTypes.TEXTURE:
                 pass
             case _:
@@ -140,6 +143,41 @@ class UnityAssetParser(AssetParser):
             raise ValueError(msg)
         return __asset_descriptor_manager__.get_asset_metadata(AssetTypes.MESH, guid=mesh_guid).get_asset_path()
 
+    @staticmethod
+    def process_model_infos(yaml_data):
+        model_infos = []
+        PrefabInstances = yaml_data.get_children('PrefabInstance')
+        for PrefabInstance in PrefabInstances:
+            model_info = copy.deepcopy(MODEL_INFO_TEMPLATE)
+            model_guid = PrefabInstance.get_child('m_SourcePrefab').get('guid')
+            asset_metadata = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.MODEL, guid=model_guid)
+            if asset_metadata is None:
+                __logger__.debug(f'process_model_infos - invalid guid: {model_guid}')
+                continue
+
+            model_info['asset_path'] = asset_metadata.get_asset_path()
+            transform_components = {'m_LocalPosition': 'position', 'm_LocalEulerAnglesHint': 'rotation', 'm_LocalScale': 'scale'}
+            # unity y-up to blender z-up
+            swizzle_map = {'x': 0, 'y': 2, 'z': 1}
+
+            for modification_group in PrefabInstance.get_child('m_Modification').get_child('m_Modifications').get_children():
+                target = modification_group.find_node('target').get_value()
+                propertyPath = modification_group.find_node('propertyPath').get_value()
+                value = modification_group.find_node('value').get_value()
+                tokens = propertyPath.split('.')
+                if len(tokens) == 2:
+                    component_name = transform_components.get(tokens[0], '')
+                    swizzle = swizzle_map.get(tokens[1], 0)
+                    value = float(value)
+                    if component_name:
+                        if ('position' == component_name or 'rotation' == component_name) and value == 0.0:
+                            continue
+                        elif 'scale' == component_name and value == 1.0:
+                            continue
+                        model_info[component_name][swizzle] = value
+            model_infos.append(model_info)
+        return model_infos
+
     def process(self, asset_descriptor_data):
         __logger__.info(f'AssetDescriptor::process')
         root_path = __asset_descriptor_manager__.get_root_path()
@@ -168,7 +206,7 @@ class UnityAssetParser(AssetParser):
                             )
                             asset_metadata_list.append(asset_metadata)
                             __asset_descriptor_manager__.register_asset_metadata(asset_metadata)
-                            __logger__.debug(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
+                            __logger__.info(f'register_asset_metadata: {asset_metadata.get_guid()}, {asset_metadata.get_asset_type()}, {asset_metadata.get_asset_path()}')
             # MATERIAL: material_create_infos
             if AssetTypes.MATERIAL == asset_type:
                 for (material_guid, material_create_info) in descriptor_data.get('material_create_infos', {}).items():
