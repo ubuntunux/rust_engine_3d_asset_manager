@@ -366,7 +366,6 @@ class AssetExportManager:
                     'rotation': self.convert_asset_rotation(child, rx=90.0)
                 })
             elif 'EMPTY' == child.type and 'COLLECTION' == child.instance_type:
-                __logger__.info(f'child: {child.name, child.instance_collection.asset_data is None}')
                 child_asset_info = AssetInfo(child.instance_collection)
                 if 'models' == child_asset_info.asset_type_name:
                     static_objects[child.name] = OrderedDict({
