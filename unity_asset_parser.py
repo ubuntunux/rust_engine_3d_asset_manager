@@ -101,33 +101,45 @@ class UnityAssetParser(AssetParser):
 
     @staticmethod
     def process_material_instances(yaml_data):
-        material_guids = []
-        MeshRenderer = yaml_data.get_child('MeshRenderer')
-        PrefabInstance = yaml_data.get_child('PrefabInstance')
-        if MeshRenderer:
-            for material_group in MeshRenderer.get_child('m_Materials').get_children():
-                material = material_group.get_node(0)
-                guid = material.get('guid')
-                if guid is None:
-                    __logger__.error(f'process_material_instances - MeshRenderer.m_Materials.guid: {guid}, value: {material}')
-                material_guids.append(material.get('guid'))
-        elif PrefabInstance:
-            for modification_group in PrefabInstance.get_child('m_Modification').get_child('m_Modifications').get_children():
-                if modification_group.find_node('propertyPath').get_value().startswith('m_Materials'):
-                    guid = modification_group.find_node('objectReference').get('guid')
+        material_guid_groups = []
+        MeshRenderers = yaml_data.get_children('MeshRenderer')
+        PrefabInstances = yaml_data.get_children('PrefabInstance')
+        if MeshRenderers:
+            for MeshRenderer in MeshRenderers:
+                material_guid_groups.append([])
+                material_guids = material_guid_groups[-1]
+                for material_group in MeshRenderer.get_child('m_Materials').get_children():
+                    material = material_group.get_node(0)
+                    guid = material.get('guid')
                     if guid is None:
-                        __logger__.error(f'process_material_instances - PrefabInstance.m_Modification.m_Modifications.objectReference.guid: {guid}, value: {modification.get_child("objectReference")}')
+                        __logger__.error(f'process_material_instances - MeshRenderer.m_Materials.guid: {guid}, value: {material}')
                     material_guids.append(guid)
+        elif PrefabInstances:
+            for PrefabInstance in PrefabInstances:
+                for modification_group in PrefabInstance.get_child('m_Modification').get_child('m_Modifications').get_children():
+                    if modification_group.find_node('propertyPath').get_value().startswith('m_Materials'):
+                        guid = modification_group.find_node('objectReference').get('guid')
+                        if guid is None:
+                            __logger__.error(f'process_material_instances - PrefabInstance.m_Modification.m_Modifications.objectReference.guid: {guid}, value: {modification.get_child("objectReference")}')
+                        material_guid_groups.append([])
+                        material_guids = material_guid_groups[-1]
+                        material_guids.append(guid)
         else:
             msg = f'Unknown yaml data: {yaml_data}'
             __logger__.error(msg)
             raise ValueError(msg)
 
-        for guid in material_guids:
-            asset_metadata = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, guid=guid)
-            if asset_metadata is None:
-                __logger__.error(f'process_material_instances - guid: {guid}')
-        return [__asset_descriptor_manager__.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, guid=guid).get_asset_path() for guid in material_guids]
+        material_path_groups = []
+        for material_guids in material_guid_groups:
+            material_path_groups.append([])
+            material_paths = material_path_groups[-1]
+            for guid in material_guids:
+                asset_metadata = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, guid=guid)
+                if asset_metadata:
+                    material_paths.append(asset_metadata.get_asset_path())
+                else:
+                    __logger__.error(f'process_material_instances - guid: {guid}')
+        return material_path_groups
 
     @staticmethod
     def process_mesh(yaml_data):

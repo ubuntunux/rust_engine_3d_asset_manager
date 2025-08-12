@@ -332,15 +332,20 @@ class AssetImportManager:
             collection.children.link(override_collection)
 
             # collect material
-            material_instances = []
-            material_paths = []
-            for material_instance_path in model.get_data(AssetTypes.MATERIAL_INSTANCE):
-                material_instance = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, asset_path=material_instance_path)
-                material_path = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.MATERIAL, asset_path=material_instance.get_data(AssetTypes.MATERIAL))
-                material_paths.append(material_path.get_asset_path())
-                material_instances.append(material_instance)
+            material_instance_group = []
+            material_path_group = []
+            for material_instance_path_group in model.get_data(AssetTypes.MATERIAL_INSTANCE):
+                material_instance_group.append([])
+                material_instances = material_instance_group[-1]
+                material_path_group.append([])
+                material_paths = material_path_group[-1]
+                for material_instance_path in material_instance_path_group:
+                    material_instance = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, asset_path=material_instance_path)
+                    material_path = self._asset_descriptor_manager.get_asset_metadata(AssetTypes.MATERIAL, asset_path=material_instance.get_data(AssetTypes.MATERIAL))
+                    material_paths.append(material_path.get_asset_path())
+                    material_instances.append(material_instance)
 
-            for obj in bpy.context.scene.objects:
+            for (object_index, obj) in enumerate(bpy.context.scene.objects):
                 # select object
                 bpy.ops.object.select_all(action='DESELECT')
                 obj.select_set(True)
@@ -350,14 +355,16 @@ class AssetImportManager:
                 utilities.move_to_collection(collection, obj)
 
                 # override material
-                for (i, material_slot) in enumerate(obj.material_slots):
-                    material = self.load_asset(AssetTypes.MATERIAL, material_paths[i])
+                material_instances = material_instance_group[object_index]
+                material_paths = material_path_group[object_index]
+                for (material_index, material_slot) in enumerate(obj.material_slots):
+                    material = self.load_asset(AssetTypes.MATERIAL, material_paths[material_index])
                     material_slot.link = 'DATA'
                     material_slot.material = material
 
                     # object material
                     material_slot.link = 'OBJECT'
-                    material_instance = material_instances[i]
+                    material_instance = material_instances[material_index]
                     material_instance_metadata = self.get_asset_metadata(AssetTypes.MATERIAL_INSTANCE, material_instance.get_asset_path())
                     if material_instance_metadata:
                         if material_instance_metadata.get_filepath() == blend_filepath:
