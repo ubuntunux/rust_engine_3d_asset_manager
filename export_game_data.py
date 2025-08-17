@@ -237,6 +237,10 @@ class AssetExportManager:
 
             # mesh
             mesh_data = mesh_collection.override_library.reference
+            if not mesh_data.asset_data:
+                __logger__.error(f'failed to export_models: {asset_info.asset_namepath}')
+                return
+
             mesh_asset_info = AssetInfo(mesh_data)
             mesh_path = mesh_asset_info.asset_namepath
             is_render_camera = True

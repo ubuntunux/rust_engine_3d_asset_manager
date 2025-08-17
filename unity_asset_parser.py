@@ -35,7 +35,7 @@ class UnityAssetParser(AssetParser):
         return ''
 
     @staticmethod
-    def extract_color(value):
+    def extract_float_array(value):
         return [eval(value) for key, value in value.items()]
 
     def process_asset_data(self, asset_descriptor_data, asset_metadata):
@@ -73,24 +73,31 @@ class UnityAssetParser(AssetParser):
         material_guid = yaml_data.get_child('Material').get_child('m_Shader').get('guid')
         material_create_info = asset_descriptor_data[AssetTypes.MATERIAL]['material_create_infos'][material_guid]
         parameters[AssetTypes.MATERIAL] = material_create_info['asset_path']
-
         parameters[AssetTypes.TEXTURE] = {}
+        parameters[AssetTypes.COLOR] = {}
+        parameters[AssetTypes.VALUE] = {}
+
         m_TexEnvs = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_TexEnvs').get_children()
         for m_TexEnvGroup in m_TexEnvs:
             m_TexEnv = m_TexEnvGroup.get_node(0)
             if m_TexEnv.get_name() in material_create_info['m_TexEnvs']:
+                # texture
                 texture_guid = m_TexEnv.get_child('m_Texture').get('guid')
                 texture = __asset_descriptor_manager__.get_asset_metadata(AssetTypes.TEXTURE, guid=texture_guid)
                 parameters[AssetTypes.TEXTURE][m_TexEnv.get_name()] = texture.get_asset_path() if texture else ''
+                # scale
+                scale = m_TexEnv.get_child('m_Scale')
+                for key, value in scale.get_value().items():
+                    scale_node_name = m_TexEnv.get_name() + "Scale" + key
+                    parameters[AssetTypes.VALUE][scale_node_name] = float(value)
 
-        parameters[AssetTypes.COLOR] = {}
+
         m_Colors = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_Colors').get_children()
         for m_ColorGroup in m_Colors:
             m_Color = m_ColorGroup.get_node(0)
             if m_Color.get_name() in material_create_info['m_Colors']:
-                parameters[AssetTypes.COLOR][m_Color.get_name()] = UnityAssetParser.extract_color(m_Color.get_value())
+                parameters[AssetTypes.COLOR][m_Color.get_name()] = UnityAssetParser.extract_float_array(m_Color.get_value())
 
-        parameters[AssetTypes.VALUE] = {}
         m_Floats = yaml_data.get_child('Material').get_child('m_SavedProperties').get_child('m_Floats').get_children()
         for m_FloatGroup in m_Floats:
             m_Float = m_FloatGroup.get_node(0)
