@@ -58,8 +58,8 @@ def clear_assets(bpy_data_type):
         bpy_data_type.remove(asset)
 
 def clear_scene(read_homefile=True):
-    if read_homefile:
-        bpy.ops.wm.read_homefile(app_template="")
+    # if read_homefile:
+    #     bpy.ops.wm.read_homefile(app_template="")
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(confirm=False)
 
