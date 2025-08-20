@@ -344,7 +344,14 @@ class AssetExportManager:
             "_skeletal_objects": skeletal_objects
         })
 
-        for child in asset.objects:
+        # collect objects
+        object_list = list(asset.objects)
+        for child in asset.children:
+            object_list.extend(list(child.objects))
+
+        # export objects
+        for child in object_list:
+            __logger__.info(f'object: {(child.name, type(child))}')
             if 'LIGHT' == child.type:
                 light_color = self.convert_light_color(child)
                 light_rotation = self.convert_asset_rotation(child, rx=90.0)
@@ -369,16 +376,18 @@ class AssetExportManager:
                     'position': self.convert_asset_location(child),
                     'rotation': self.convert_asset_rotation(child, rx=90.0)
                 })
-            elif 'EMPTY' == child.type and 'COLLECTION' == child.instance_type:
-                child_asset_info = AssetInfo(child.instance_collection)
-                if 'models' == child_asset_info.asset_type_name:
-                    static_objects[child.name] = OrderedDict({
-                        "_model_data_name": child_asset_info.asset_namepath,
-                        "_position": self.convert_asset_location(child),
-                        "_rotation": self.convert_asset_rotation(child),
-                        "_scale": self.convert_asset_scale(child)
-                    })
-                    # TODO - Skeletal Mesh
+            elif 'EMPTY' == child.type:
+                if 'COLLECTION' == child.instance_type:
+                    child_asset_info = AssetInfo(child.instance_collection)
+                    if 'models' == child_asset_info.asset_type_name:
+                        static_objects[child.name] = OrderedDict({
+                            "_model_data_name": child_asset_info.asset_namepath,
+                            "_position": self.convert_asset_location(child),
+                            "_rotation": self.convert_asset_rotation(child),
+                            "_scale": self.convert_asset_scale(child)
+                        })
+                    else:
+                        __logger__.error(f'not implemented asset type {(child.name, child_asset_info.asset_type_name)}')
                 else:
                     __logger__.error(f'not implemented asset type {(child.name, child_asset_info.asset_type_name)}')
             else:
