@@ -191,8 +191,10 @@ class UnityAssetParser(AssetParser):
                     if component_name:
                         if ('position' == component_name or 'rotation' == component_name) and value == 0.0:
                             continue
-                        elif 'scale' == component_name and value == 1.0:
-                            continue
+                        elif 'scale' == component_name:
+                            value = abs(value)
+                            if value == 1.0:
+                                continue
                         model_info[component_name][swizzle] = value
             model_infos.append(model_info)
         return model_infos
