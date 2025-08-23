@@ -117,7 +117,7 @@ class AssetImportManager:
             if filepath in asset_metadata_in_files:
                 continue
 
-            utilities.clear_scene()
+            utilities.clear_scene(read_homefile=False)
             with bpy.data.libraries.load(filepath.as_posix(), link=True, assets_only=True) as (data_from, data_to):
                 data_to.actions = data_from.actions
                 data_to.armatures = data_from.armatures

@@ -55,17 +55,23 @@ def clear_assets(bpy_data_type):
     assets = bpy_data_type.values()
     for asset in assets:
         asset.use_fake_user = False
-        bpy_data_type.remove(asset)
+        bpy_data_type.remove(asset, do_unlink=True)
 
 def clear_scene(read_homefile=True):
-    # if read_homefile:
-    #     bpy.ops.wm.read_homefile(app_template="")
-    bpy.ops.object.select_all(action='SELECT')
-    bpy.ops.object.delete(confirm=False)
+    if read_homefile:
+        bpy.ops.wm.read_homefile(app_template="")
 
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete(use_global=False)
+
+    clear_assets(bpy.data.actions)
+    clear_assets(bpy.data.armatures)
+    clear_assets(bpy.data.materials)
+    clear_assets(bpy.data.meshes)
+    clear_assets(bpy.data.texts)
     clear_assets(bpy.data.collections)
     clear_assets(bpy.data.objects)
-    clear_assets(bpy.data.texts)
 
     bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
