@@ -29,6 +29,10 @@ def get_bound(collection):
             pos_max = Vector([max(z) for z in zip(pos, pos_max)])
     return (pos_min, pos_max)
 
+def collect_object(asset, object_list: list):
+    object_list.extend(list(asset.objects))
+    for grand_child in asset.children:
+        collect_object(grand_child, object_list)
 
 class ResourceTypeInfo:
     def __init__(self, resource_dirname, resource_ext, external_ext):
@@ -198,7 +202,10 @@ class AssetExportManager:
                 self.write_to_file('export material_instance', material_instance_info, export_filepath)
         return material_instance_name_paths
 
-    def export_selected_meshes(self, asset_info):
+    def export_selected_meshes(self, asset, asset_info):
+        # export material instance
+        self.export_material_instance(asset_info, asset)
+
         export_filepath = asset_info.get_asset_filepath(self.resource_path, '.gltf')
 
         try:
@@ -345,9 +352,8 @@ class AssetExportManager:
         })
 
         # collect objects
-        object_list = list(asset.objects)
-        for child in asset.children:
-            object_list.extend(list(child.objects))
+        object_list = []
+        collect_object(asset, object_list)
 
         # export objects
         for child in object_list:
@@ -420,16 +426,18 @@ class AssetExportManager:
              game_data["_" + child_property_asset.name] = child_game_data
 
     def get_custom_properties(self, asset, asset_info, property_asset_name):
+        object_list = []
+        collect_object(asset, object_list)
+
         game_data = OrderedDict()
-        for property_asset in asset.objects:
+        for property_asset in object_list:
             if property_asset.name == property_asset_name:
                 self.asset_property_to_game_data(property_asset, game_data)
         return game_data
 
     def export_game_data(self, asset, asset_info):
-        __logger__.info(f'export_game_data: {asset_info.asset_namepath}')
-        __logger__.info(f'library_name: {self.library_name}, external_path: {self.external_path}, resource_path: {self.resource_path}')
-        
+        __logger__.info(f'export_game_data: {asset_info.asset_namepath}, library_name: {self.library_name}, external_path: {self.external_path}, resource_path: {self.resource_path}')
+
         tokens = asset_info.asset_library_path.split('/')
         if 'game_data' == asset_info.asset_type_name and 2 < len(tokens):
             game_data = OrderedDict()
@@ -467,7 +475,9 @@ class AssetExportManager:
 
     # export game asset
     def get_game_asset_data(self, asset_container, child_asset, asset_data_name):
-        for child_object in child_asset.objects:
+        object_list = []
+        collect_object(child_asset, object_list)
+        for child_object in object_list:
             child_object_info = AssetInfo(child_object.instance_collection)
             asset_container[child_object.name] = OrderedDict({
                 asset_data_name: child_object_info.asset_namepath,
@@ -478,7 +488,6 @@ class AssetExportManager:
 
     # export game scene
     def get_game_data_scenes(self, asset, asset_info):
-        blocks = OrderedDict()
         characters = OrderedDict()
         items = OrderedDict()
         player = OrderedDict()
@@ -490,7 +499,6 @@ class AssetExportManager:
             "_player": player,
             "_props": props,
             "_scene": "",
-            "_start_point": [0, 0, 0],
             "_terrain": terrain
         })
 
@@ -507,9 +515,6 @@ class AssetExportManager:
                 game_data['_scene'] = self.get_scene_data(child_asset)
             elif '_terrain' == child_asset.name:
                 self.get_game_asset_data(terrain, child_asset, "_model_data_name")
-            elif '_start_point' == child_asset.name:
-                for child_object in child_asset.objects:
-                    game_data['_start_point'] = self.convert_asset_location(child_object)
             else:
                 __logger__.error(f'not implemented object type {child_asset.name}')
         return game_data
@@ -522,7 +527,7 @@ class AssetExportManager:
         if 'animation_layers' == asset_info.asset_type_name:
             self.export_animation_layers(asset, asset_info)
         elif 'meshes' == asset_info.asset_type_name:
-            self.export_selected_meshes(asset_info)
+            self.export_selected_meshes(asset, asset_info)
         elif 'models' == asset_info.asset_type_name:
             self.export_models(asset, asset_info)
         elif 'scenes' == asset_info.asset_type_name:
