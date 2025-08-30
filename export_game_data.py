@@ -158,7 +158,12 @@ class AssetExportManager:
             material_instance_slots = material_instance_slots_list[list_index]
             for material_index in range(len(materials)):
                 material = materials[material_index]
+                if material is None or material.asset_data is None:
+                    continue
+
                 material_instance = material_instance_slots[material_index].material
+                if material_instance is None or material_instance.asset_data is None:
+                    continue
 
                 material_asset_info = AssetInfo(material)
                 material_instance_asset_info = AssetInfo(material_instance)
