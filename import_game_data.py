@@ -294,7 +294,7 @@ class AssetImportManager:
                         material_slot.material = default_material
             
             # save final
-            collection.asset_generate_preview()
+            utilities.asset_generate_preview(collection.name)
             utilities.save_as(blend_filepath)
     
     def import_models(self):
@@ -376,7 +376,7 @@ class AssetImportManager:
                         self.override_material(material_slot.material, material_instance, blend_filepath)
             
             # save final
-            collection.asset_generate_preview()
+            utilities.asset_generate_preview(collection.name)
             utilities.save_as(blend_filepath)
 
     def import_scenes(self):
@@ -415,7 +415,7 @@ class AssetImportManager:
                     collection.objects.link(asset)
 
             # save final
-            collection.asset_generate_preview()
+            utilities.asset_generate_preview(collection.name)
             utilities.save_as(blend_filepath)
         
     def import_assets(self):

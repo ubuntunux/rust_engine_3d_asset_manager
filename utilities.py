@@ -85,6 +85,22 @@ def move_to_collection(collection, obj):
         bpy.context.scene.collection.objects.unlink(obj)
         collection.objects.link(obj)
 
+def find_layer_collection(parent_layer_collection, name):
+    if parent_layer_collection.name == name:
+        return parent_layer_collection
+    for child in parent_layer_collection.children:
+        found_lc = find_layer_collection(child, name)
+        if found_lc:
+            return found_lc
+    return None
+
+def set_active_collection(collection):
+    bpy.context.view_layer.active_layer_collection = find_layer_collection(bpy.context.view_layer.layer_collection, collection.name)
+
+def asset_generate_preview(collection):
+    bpy.context.view_layer.active_layer_collection = find_layer_collection(bpy.context.view_layer.layer_collection, collection.name)
+    collection.asset_generate_preview()
+
 def save_as(filepath):
     if not filepath.parent.exists():
         os.makedirs(filepath.parent.as_posix())
