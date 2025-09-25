@@ -222,6 +222,7 @@ class AssetExportManager:
                 filepath=export_filepath,
                 export_format='GLTF_SEPARATE',
                 use_selection=True,
+                export_apply=True,
                 export_yup=True,
                 export_texcoords=True,
                 export_normals=True,
