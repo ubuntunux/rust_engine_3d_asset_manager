@@ -491,6 +491,7 @@ class AssetExportManager:
                 "_rotation": self.convert_asset_rotation(child_object),
                 "_scale": self.convert_asset_scale(child_object)
             })
+            self.asset_property_to_game_data(child_object, asset_container[child_object.name])
 
     # export game scene
     def get_game_data_scenes(self, asset, asset_info):
