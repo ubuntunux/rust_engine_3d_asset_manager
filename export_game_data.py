@@ -489,9 +489,15 @@ class AssetExportManager:
                 asset_data_name: child_object_info.asset_namepath,
                 "_position": self.convert_asset_location(child_object),
                 "_rotation": self.convert_asset_rotation(child_object),
-                "_scale": self.convert_asset_scale(child_object)
+                "_scale": self.convert_asset_scale(child_object),
+
             })
-            self.asset_property_to_game_data(child_object, asset_container[child_object.name])
+
+            instance_parameters = {}
+            self.asset_property_to_game_data(child_object, instance_parameters)
+            if instance_parameters:
+                asset_container[child_object.name]["_instance_parameters"] = instance_parameters
+
 
     # export game scene
     def get_game_data_scenes(self, asset, asset_info):
