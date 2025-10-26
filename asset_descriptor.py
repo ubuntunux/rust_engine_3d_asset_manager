@@ -93,6 +93,7 @@ class AssetTypes:
     GAME_CHARACTER = 'GAME_CHARACTER'
     GAME_DATA = 'GAME_DATA'
     GAME_SCENE = 'GAME_SCENE'
+    GAME_SCENARIO = 'GAME_SCENARIO'
     GAME_ITEM = 'GAME_ITEM'
     GAME_PROP = 'GAME_PROP'
     GAME_WEAPON = 'GAME_WEAPON'
@@ -113,6 +114,7 @@ class AssetTypeCatalogNames:
         AssetTypes.GAME_CHARACTER: 'game_data/characters',
         AssetTypes.GAME_DATA: 'game_data/data',
         AssetTypes.GAME_SCENE: 'game_data/game_scenes',
+        AssetTypes.GAME_SCENARIO: 'game_data/scenario',
         AssetTypes.GAME_ITEM: 'game_data/items',
         AssetTypes.GAME_PROP: 'game_data/props',
         AssetTypes.GAME_WEAPON: 'game_data/weapons',
@@ -143,6 +145,7 @@ class AssetExts:
         AssetTypes.GAME_CHARACTER: ['.data'],
         AssetTypes.GAME_DATA: ['.data'],
         AssetTypes.GAME_SCENE: ['.data'],
+        AssetTypes.GAME_SCENARIO: ['.data'],
         AssetTypes.GAME_ITEM: ['.data'],
         AssetTypes.GAME_PROP: ['.data'],
         AssetTypes.GAME_WEAPON: ['.data'],

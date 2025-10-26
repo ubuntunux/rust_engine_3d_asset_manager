@@ -340,6 +340,34 @@ class AssetExportManager:
             export_model_filepath = asset_info.get_asset_filepath(self.resource_path, '.model')
             self.write_to_file('export model', model_info, export_model_filepath)
 
+    def get_game_scene_data(self, asset):
+        # collect objects
+        object_list = []
+        collect_object(asset, object_list)
+        game_scene_data = OrderedDict()
+
+        # export objects
+        for child in object_list:
+            __logger__.info(f'get_game_scene_data object: {(child.name, type(child), child.type)}')
+            if 'EMPTY' == child.type:
+                if 'COLLECTION' == child.instance_type:
+                    child_asset_info = AssetInfo(child.instance_collection)
+                    __logger__.info(f'    object: {(child.name, type(child), child.type, child_asset_info.__dict__, )}')
+                    if 'game_scene' == child_asset_info.asset_type_name:
+                        game_scene_data = OrderedDict({
+                            "_game_scene_data_name": child_asset_info.asset_namepath,
+                            "_position": self.convert_asset_location(child),
+                            "_rotation": self.convert_asset_rotation(child),
+                            "_scale": self.convert_asset_scale(child)
+                        })
+                    else:
+                        __logger__.error(f'not implemented asset type {(child.name, child_asset_info.asset_type_name)}')
+                else:
+                    __logger__.error(f'not implemented asset type {(child.name, child_asset_info.asset_type_name)}')
+            else:
+                __logger__.error(f'not implemented object type {(child.name, child.type)}')
+        return game_scene_data
+
     def get_scene_data(self, asset):
         cameras = OrderedDict()
         directional_lights = OrderedDict()
@@ -468,8 +496,10 @@ class AssetExportManager:
                 game_data = self.get_custom_properties(asset, asset_info, 'prop_data')
             elif 'weapons' == game_data_type:
                 game_data = self.get_custom_properties(asset, asset_info, 'weapon_data')
-            elif 'game_scenes':
+            elif 'game_scenes' == game_data_type:
                 game_data = self.get_game_data_scenes(asset, asset_info)
+            elif 'scenario' == game_data_type:
+                game_data = self.get_game_data_scenario(asset, asset_info)
             else:
                 __logger__.error(f'not implemented game data: {asset_info.asset_fullpath}')
                 
@@ -497,7 +527,6 @@ class AssetExportManager:
             self.asset_property_to_game_data(child_object, instance_parameters)
             if instance_parameters:
                 asset_container[child_object.name]["_instance_parameters"] = instance_parameters
-
 
     # export game scene
     def get_game_data_scenes(self, asset, asset_info):
@@ -528,6 +557,36 @@ class AssetExportManager:
                 game_data['_scene'] = self.get_scene_data(child_asset)
             elif '_terrain' == child_asset.name:
                 self.get_game_asset_data(terrain, child_asset, "_model_data_name")
+            else:
+                __logger__.error(f'not implemented object type {child_asset.name}')
+        return game_data
+
+    # export game scenario
+    def get_game_data_scenario(self, asset, asset_info):
+        characters = OrderedDict()
+        items = OrderedDict()
+        player = OrderedDict()
+        props = OrderedDict()
+        game_scenes = OrderedDict()
+        game_data = OrderedDict({
+            "_characters": characters,
+            "_items": items,
+            "_player": player,
+            "_props": props,
+            "_game_scenes": game_scenes,
+        })
+
+        for child_asset in asset.children:
+            if '_characters' == child_asset.name:
+                self.get_game_asset_data(characters, child_asset, "_character_data_name")
+            elif '_items' == child_asset.name:
+                self.get_game_asset_data(items, child_asset, "_item_data_name")
+            elif '_props' == child_asset.name:
+                self.get_game_asset_data(props, child_asset, "_prop_data_name")
+            elif '_player' == child_asset.name:
+                self.get_game_asset_data(player, child_asset, "_character_data_name")
+            elif '_game_scene' == child_asset.name:
+                self.get_game_asset_data(game_scenes, child_asset, "_game_scene_data_name")
             else:
                 __logger__.error(f'not implemented object type {child_asset.name}')
         return game_data
