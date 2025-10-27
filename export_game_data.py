@@ -585,7 +585,7 @@ class AssetExportManager:
                 self.get_game_asset_data(props, child_asset, "_prop_data_name")
             elif '_player' == child_asset.name:
                 self.get_game_asset_data(player, child_asset, "_character_data_name")
-            elif '_game_scene' == child_asset.name:
+            elif '_game_scenes' == child_asset.name:
                 self.get_game_asset_data(game_scenes, child_asset, "_game_scene_data_name")
             else:
                 __logger__.error(f'not implemented object type {child_asset.name}')
