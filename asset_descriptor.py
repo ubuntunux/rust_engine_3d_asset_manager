@@ -108,6 +108,29 @@ class AssetTypes:
     def get_types(cls):
         return [key for key in cls.__dict__.keys() if key.isupper()]
 
+class AssetExportPriority:
+    asset_type_export_priority = {
+        AssetTypes.ANIMATION_LAYER: 3,
+        AssetTypes.GAME_CHARACTER: 5,
+        AssetTypes.GAME_DATA: 5,
+        AssetTypes.GAME_SCENE: 6,
+        AssetTypes.GAME_SCENARIO: 7,
+        AssetTypes.GAME_ITEM: 5,
+        AssetTypes.GAME_PROP: 5,
+        AssetTypes.GAME_WEAPON: 5,
+        AssetTypes.MATERIAL: 0,
+        AssetTypes.MATERIAL_INSTANCE: 1,
+        AssetTypes.MESH: 1,
+        AssetTypes.MODEL: 2,
+        AssetTypes.SCENE: 4,
+        AssetTypes.TEXTURE: 0
+    }
+
+    @classmethod
+    def get_asset_type_export_priority(cls, asset_type):
+        return cls.asset_type_export_priority.get(asset_type, 0)
+
+
 class AssetTypeCatalogNames:
     asset_type_catalog_names = {
         AssetTypes.ANIMATION_LAYER: 'animation_layers',

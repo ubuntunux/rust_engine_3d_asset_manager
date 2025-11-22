@@ -11,7 +11,7 @@ from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
 from mathutils import Vector
-from .asset_descriptor import AssetTypeCatalogNames, AssetExts, AssetMetadata
+from .asset_descriptor import AssetTypeCatalogNames, AssetExts, AssetMetadata, AssetExportPriority
 from . import utilities
 
 __logger__ = None
@@ -181,22 +181,23 @@ class AssetExportManager:
                         if 'TEX_IMAGE' == node.type:
                             # gather texture parameter
                             image_filepath = node.image.filepath.replace('\\', '/')
-                            tokens = image_filepath.split('/')
-                            textures_index = tokens.index('textures')
-                            image_relative_filepath = os.path.join(*tokens[textures_index:])
-                            image_filepath = os.path.abspath(os.path.join(self.resource_path, image_relative_filepath))
-                            image_namepath = os.path.splitext(os.path.relpath(image_filepath, texture_dirpath))[0]
-                            material_parameters[node.label] = image_namepath
+                            if image_filepath:
+                                tokens = image_filepath.split('/')
+                                textures_index = tokens.index('textures')
+                                image_relative_filepath = os.path.join(*tokens[textures_index:])
+                                image_filepath = os.path.abspath(os.path.join(self.resource_path, image_relative_filepath))
+                                image_namepath = os.path.splitext(os.path.relpath(image_filepath, texture_dirpath))[0]
+                                material_parameters[node.label] = image_namepath
 
-                            # export texture
-                            EXPORT_TEXTURES = False
-                            if EXPORT_TEXTURES:
-                                image_external_filepath = os.path.abspath(os.path.join(self.external_path, ))
-                                if os.path.exists(image_external_filepath):
-                                    src_modified_time = os.path.getmtime(image_external_filepath)
-                                    dst_modified_time = os.path.getmtime(image_filepath) if os.path.exists(image_filepath) else 0
-                                    if dst_modified_time < src_modifed_time:
-                                        self.copy_file('export texture', image_external_filepath, image_filepath)
+                                # export texture
+                                EXPORT_TEXTURES = False
+                                if EXPORT_TEXTURES:
+                                    image_external_filepath = os.path.abspath(os.path.join(self.external_path, ))
+                                    if os.path.exists(image_external_filepath):
+                                        src_modified_time = os.path.getmtime(image_external_filepath)
+                                        dst_modified_time = os.path.getmtime(image_filepath) if os.path.exists(image_filepath) else 0
+                                        if dst_modified_time < src_modifed_time:
+                                            self.copy_file('export texture', image_external_filepath, image_filepath)
                         elif 'RGB' == node.type:
                             material_parameters[node.label] = list(node.outputs[0].default_value)
                         elif 'VALUE' == node.type:
@@ -391,7 +392,7 @@ class AssetExportManager:
 
         # export objects
         for child in object_list:
-            __logger__.info(f'object: {(child.name, type(child))}')
+            __logger__.debug(f'object: {(child.name, type(child))}')
             if 'LIGHT' == child.type:
                 light_color = self.convert_light_color(child)
                 light_rotation = self.convert_asset_rotation(child, rx=90.0)
@@ -448,7 +449,7 @@ class AssetExportManager:
                 if property_type in [bool, int, float, str]:
                      game_data[key] = property_value
                 elif property_type is bpy.types.Collection:
-                    if property_value:
+                    if property_value and property_value.asset_data:
                         property_value_asset_info = AssetInfo(property_value)
                         game_data[key] = property_value_asset_info.asset_namepath
                 else:
@@ -698,6 +699,7 @@ class AssetExportManager:
                 asset_metadata_in_files[filepath].append(asset_metadata)
 
         # export assets
+        export_filepaths = []
         for filepath, asset_metadata_list in asset_metadata_in_files.items():
             source_file_mtime = utilities.get_mtime(filepath)
             for source_asset_metadata in asset_metadata_list:
@@ -710,11 +712,15 @@ class AssetExportManager:
                         export_assets = False
 
                 if export_assets and filepath.suffix.lower() == '.blend':
-                    self.export_blend(filepath.as_posix())
+                    export_filepaths.append((AssetExportPriority.get_asset_type_export_priority(asset_type), filepath.as_posix()))
                     break
                 else:
                     __logger__.debug(f'>>> skip export filepath: {filepath}, assets: {[metadata.get_asset_path() for metadata in asset_metadata_list]}')
                     pass
+
+        export_filepaths.sort()
+        for (priority, export_filepath) in export_filepaths:
+            self.export_blend(export_filepath)
 
         # remove asset_metadata
         # for asset_type, asset_metadata_list in exporter_asset_metadata.items():
