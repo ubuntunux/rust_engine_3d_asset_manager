@@ -421,7 +421,15 @@ class AssetExportManager:
                 if 'COLLECTION' == child.instance_type:
                     child_asset_info = AssetInfo(child.instance_collection)
                     if 'models' == child_asset_info.asset_type_name:
+                        scene_object_type = "Default"
+                        if child.parent.name == '_collision':
+                            scene_object_type = "Collision"
+                        elif child.parent.name == '_no_collision':
+                            scene_object_type = "NoCollision"
+                        elif child.parent.name == '_terrain':
+                            scene_object_type = "Terrain"
                         static_objects[child.name] = OrderedDict({
+                            "_scene_object_type": scene_object_type,
                             "_model_data_name": child_asset_info.asset_namepath,
                             "_position": self.convert_asset_location(child),
                             "_rotation": self.convert_asset_rotation(child),
@@ -511,7 +519,7 @@ class AssetExportManager:
         __logger__.error(f'error export_game_data: {asset_info.asset_fullpath}')
 
     # export game asset
-    def get_game_asset_data(self, asset_container, child_asset, asset_data_name):
+    def get_game_asset_data(self, asset_container, child_asset, asset_data_name, scene_object_type = None):
         object_list = []
         collect_object(child_asset, object_list)
         for child_object in object_list:
@@ -520,9 +528,11 @@ class AssetExportManager:
                 asset_data_name: child_object_info.asset_namepath,
                 "_position": self.convert_asset_location(child_object),
                 "_rotation": self.convert_asset_rotation(child_object),
-                "_scale": self.convert_asset_scale(child_object),
-
+                "_scale": self.convert_asset_scale(child_object)
             })
+
+            if scene_object_type:
+                asset_container[child_object.name]["_scene_object_type"] = scene_object_type
 
             instance_parameters = {}
             self.asset_property_to_game_data(child_object, instance_parameters)
@@ -535,14 +545,12 @@ class AssetExportManager:
         items = OrderedDict()
         player = OrderedDict()
         props = OrderedDict()
-        terrain = OrderedDict()
         game_data = OrderedDict({
             "_characters": characters,
             "_items": items,
             "_player": player,
             "_props": props,
-            "_scene": "",
-            "_terrain": terrain
+            "_scene": ""
         })
 
         for child_asset in asset.children:
@@ -556,8 +564,6 @@ class AssetExportManager:
                 self.get_game_asset_data(player, child_asset, "_character_data_name")
             elif '_scene' == child_asset.name:
                 game_data['_scene'] = self.get_scene_data(child_asset)
-            elif '_terrain' == child_asset.name:
-                self.get_game_asset_data(terrain, child_asset, "_model_data_name")
             else:
                 __logger__.error(f'not implemented object type {child_asset.name}')
         return game_data
