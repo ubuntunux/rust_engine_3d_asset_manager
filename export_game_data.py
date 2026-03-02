@@ -422,12 +422,13 @@ class AssetExportManager:
                     child_asset_info = AssetInfo(child.instance_collection)
                     if 'models' == child_asset_info.asset_type_name:
                         scene_object_type = "Default"
-                        if child.parent.name == '_collision':
-                            scene_object_type = "Collision"
-                        elif child.parent.name == '_no_collision':
-                            scene_object_type = "NoCollision"
-                        elif child.parent.name == '_terrain':
-                            scene_object_type = "Terrain"
+                        if child.parent:
+                            if child.parent.name == '_collision':
+                                scene_object_type = "Collision"
+                            elif child.parent.name == '_no_collision':
+                                scene_object_type = "NoCollision"
+                            elif child.parent.name == '_terrain':
+                                scene_object_type = "Terrain"
                         static_objects[child.name] = OrderedDict({
                             "_scene_object_type": scene_object_type,
                             "_model_data_name": child_asset_info.asset_namepath,
