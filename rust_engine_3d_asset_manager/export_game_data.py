@@ -553,7 +553,7 @@ class AssetExportManager:
             "_items": items,
             "_player": player,
             "_props": props,
-            "_scene": ""
+            "_scene": {}
         })
 
         for child_asset in asset.children:
@@ -584,7 +584,7 @@ class AssetExportManager:
             "_player": player,
             "_props": props,
             "_game_scenes": game_scenes,
-            "_scene": ""
+            "_scene": {}
         })
 
         for child_asset in asset.children:
