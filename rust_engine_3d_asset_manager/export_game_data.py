@@ -524,8 +524,8 @@ class AssetExportManager:
         object_list = []
         collect_object(child_asset, object_list)
         for child_object in object_list:
-            if child_object.instance_collection is None:
-                continue
+            if child_object.instance_collection is None or child_object.instance_collection.asset_data is None:
+                __logger__.info(f'none child_object: {child_object.name, child_object.instance_collection}')
             child_object_info = AssetInfo(child_object.instance_collection)
             asset_container[child_object.name] = OrderedDict({
                 asset_data_name: child_object_info.asset_namepath,
