@@ -450,12 +450,39 @@ class AssetExportManager:
         export_filepath = asset_info.get_asset_filepath(self.resource_path, ".scene")
         self.write_to_file('export scene', scene_data, export_filepath)
 
+    def parse_item_effects_property(self, key, property_value):
+        if isinstance(property_value, str):
+            raw = property_value.strip()
+            if not raw:
+                return []
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as e:
+                __logger__.error(f'invalid JSON for {key}: {raw!r} ({e})')
+                return []
+            if isinstance(parsed, list):
+                return parsed
+            if isinstance(parsed, dict):
+                return [{k: v} for k, v in parsed.items()]
+            __logger__.error(f'unexpected JSON type for {key}: {type(parsed)}')
+            return []
+        if hasattr(property_value, 'to_dict'):
+            return [{k: v} for k, v in property_value.to_dict().items()]
+        if hasattr(property_value, 'to_list'):
+            return list(property_value.to_list())
+        __logger__.error(f'get_game_data_character not implemented type: {key, type(property_value)}')
+        return []
+
     def asset_property_to_game_data(self, property_asset, game_data):
         for key in property_asset.keys():
             if key not in property_asset.bl_rna.properties:
                 property_value = property_asset[key]
                 property_type = type(property_value)
-                if property_type in [bool, int, float, str]:
+                if key == '_item_effects':
+                    effects = self.parse_item_effects_property(key, property_value)
+                    if effects:
+                        game_data[key] = effects
+                elif property_type in [bool, int, float, str]:
                      game_data[key] = property_value
                 elif property_type is bpy.types.Collection:
                     if property_value and property_value.asset_data:
