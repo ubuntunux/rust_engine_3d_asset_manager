@@ -482,6 +482,9 @@ class AssetExportManager:
                     effects = self.parse_item_effects_property(key, property_value)
                     if effects:
                         game_data[key] = effects
+                elif key == '_weapon_type' and isinstance(property_value, str):
+                    weapon_type = property_value.strip() or 'None'
+                    game_data[key] = weapon_type
                 elif property_type in [bool, int, float, str]:
                      game_data[key] = property_value
                 elif property_type is bpy.types.Collection:
