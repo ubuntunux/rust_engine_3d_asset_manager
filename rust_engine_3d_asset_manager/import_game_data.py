@@ -2,6 +2,7 @@ import math
 import os
 import uuid
 import json
+import traceback
 from pathlib import Path
 
 import bpy
@@ -131,17 +132,22 @@ class AssetImportManager:
                     if asset.asset_data:
                         library_path = os.path.abspath(bpy.path.abspath(asset.library.filepath))                        
                         if library_path == filepath.as_posix():
-                            abs_asset_path = Path(self.get_asset_catalog_name_by_id(asset.asset_data.catalog_id), asset.name)
-                            asset_type, asset_path = self.get_asset_type_and_name_from_asset_path(abs_asset_path)
-                            asset_metadata = AssetMetadata(
-                                asset_type=asset_type,
-                                asset_path=asset_path,
-                                filepath=filepath,
-                                mtime=utilities.get_mtime(filepath)
-                            )
-                            if filepath not in asset_metadata_in_files:
-                                asset_metadata_in_files[filepath] = []
-                            asset_metadata_in_files[filepath].append(asset_metadata)
+                            try:
+                                abs_asset_path = Path(self.get_asset_catalog_name_by_id(asset.asset_data.catalog_id), asset.name)
+                                asset_type, asset_path = self.get_asset_type_and_name_from_asset_path(abs_asset_path)
+                                asset_metadata = AssetMetadata(
+                                    asset_type=asset_type,
+                                    asset_path=asset_path,
+                                    filepath=filepath,
+                                    mtime=utilities.get_mtime(filepath)
+                                )
+                                if filepath not in asset_metadata_in_files:
+                                    asset_metadata_in_files[filepath] = []
+                                asset_metadata_in_files[filepath].append(asset_metadata)
+                            except:
+                                __logger__.error(traceback.format_exc())
+                                continue
+
 
         # convert asset metadata
         self._asset_metadata.clear()
